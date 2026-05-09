@@ -1,65 +1,154 @@
-import Image from "next/image";
+// app/page.tsx
+"use client";
+
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase/client";
+import { useCartStore } from "@/store/cart";
+import toast from "react-hot-toast";
+
+// TypeScript interfaces for our data
+interface Category {
+  id: string;
+  name: string;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  category_id: string;
+  image_url: string;
+}
 
 export default function Home() {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string>("all");
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Bring in the Zustand cart action
+  const addItem = useCartStore((state) => state.addItem);
+
+  useEffect(() => {
+    async function fetchMenuData() {
+      // Fetch categories and products simultaneously
+      const [categoryRes, productRes] = await Promise.all([
+        supabase.from("categories").select("*"),
+        supabase.from("products").select("*"),
+      ]);
+
+      if (categoryRes.data) setCategories(categoryRes.data);
+      if (productRes.data) setProducts(productRes.data);
+      setIsLoading(false);
+    }
+
+    fetchMenuData();
+  }, []);
+
+  // Filter products based on the selected category pill
+  const filteredProducts = activeCategory === "all"
+    ? products
+    : products.filter(p => p.category_id === activeCategory);
+
+  if (isLoading) {
+    return <div className="text-center py-20 text-xl font-semibold">Loading the menu...</div>;
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="py-8 px-4 max-w-6xl mx-auto space-y-10">
+
+      {/* Hero Section */}
+      <header className="text-center space-y-4">
+        <h1 className="text-5xl font-extrabold text-gray-900">
+          Crave it? <span className="text-orange-500">BiteFlow</span> it.
+        </h1>
+        <p className="text-gray-500 text-lg max-w-2xl mx-auto">
+          Fresh ingredients, fast delivery, and a seamless ordering experience.
+        </p>
+      </header>
+
+      {/* Category Filters */}
+      <div className="flex flex-wrap justify-center gap-3">
+        <button
+          onClick={() => setActiveCategory("all")}
+          className={`px-6 py-2 rounded-full font-medium transition-colors ${activeCategory === "all"
+              ? "bg-gray-900 text-white"
+              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+        >
+          All Menu
+        </button>
+        {categories.map((cat) => (
+          <button
+            key={cat.id}
+            onClick={() => setActiveCategory(cat.id)}
+            className={`px-6 py-2 rounded-full font-medium transition-colors ${activeCategory === cat.id
+                ? "bg-orange-500 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+          >
+            {cat.name}
+          </button>
+        ))}
+      </div>
+
+      {/* Product Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        {filteredProducts.length === 0 ? (
+          <p className="col-span-full text-center text-gray-500 py-10">
+            No products found in this category.
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-39.5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/8 px-5 transition-colors hover:border-transparent hover:bg-black/4 dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-39.5"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+        ) : (
+          filteredProducts.map((product) => (
+            <div key={product.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+              {/* Product Image */}
+              <div
+                className="h-48 w-full bg-cover bg-center"
+                style={{ backgroundImage: `url(${product.image_url})` }}
+              />
+
+              {/* Product Details */}
+              <div className="p-5 space-y-4">
+                <div className="flex justify-between items-start gap-2">
+                  <h3 className="font-bold text-lg text-gray-900 leading-tight">
+                    {product.name}
+                  </h3>
+                  <span className="font-bold text-green-600">
+                    ${product.price.toFixed(2)}
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => {
+                    addItem({
+                      id: product.id,
+                      name: product.name,
+                      price: product.price,
+                      quantity: 1
+                    });
+                    toast.success(`${product.name} added to cart!`, {
+                      style: {
+                        border: '1px solid #10B981',
+                        padding: '16px',
+                        color: '#047857',
+                        fontWeight: 'bold',
+                      },
+                      iconTheme: {
+                        primary: '#10B981',
+                        secondary: '#FFFAEE',
+                      },
+                    });
+                  }}
+                  className="w-full bg-orange-100 text-orange-600 hover:bg-orange-500 hover:text-white font-semibold py-2.5 rounded-xl transition-colors cursor-pointer"
+                >
+                  Add to Cart
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
     </div>
   );
 }
