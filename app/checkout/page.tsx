@@ -52,6 +52,17 @@ export default function CheckoutPage() {
                 router.push("/login");
             } else {
                 setUserId(user.id);
+                // Pre-fill delivery details from saved profile metadata if present
+                const savedMeta = localStorage.getItem(`biteflow-profile-meta-${user.id}`);
+                if (savedMeta) {
+                    const parsed = JSON.parse(savedMeta);
+                    setFullName(parsed.username || user.user_metadata?.username || "");
+                    setAddress(parsed.address || "");
+                    setCity(parsed.city || "");
+                    setPhoneNumber(parsed.phoneNumber || "");
+                } else {
+                    setFullName(user.user_metadata?.username || "");
+                }
                 setIsCheckingSession(false);
             }
         }
@@ -132,14 +143,70 @@ export default function CheckoutPage() {
         setIsPlacingOrder(true);
 
         try {
-            // Simulate realistic network latency for premium feel
-            await new Promise((resolve) => setTimeout(resolve, 800));
+            // 1. Insert order into the database
+            const { data: orderData, error: orderError } = await supabase
+                .from("orders")
+                .insert({
+                    user_id: userId,
+                    total_price: grandTotal,
+                    status: "pending"
+                })
+                .select();
 
-            // 1. Clear cart
+            if (orderError) {
+                console.error("Order insertion error:", orderError);
+                throw new Error(orderError.message);
+            }
+
+            if (!orderData || orderData.length === 0) {
+                throw new Error("Failed to retrieve placed order metadata.");
+            }
+
+            const orderId = orderData[0].id;
+
+            // 2. Insert order items
+            const orderItemsInsert = items.map((item) => ({
+                order_id: orderId,
+                product_id: item.id,
+                quantity: item.quantity,
+                price_at_time: item.price
+            }));
+
+            const { error: itemsError } = await supabase
+                .from("order_items")
+                .insert(orderItemsInsert);
+
+            if (itemsError) {
+                console.error("Order items insertion error:", itemsError);
+                throw new Error(itemsError.message);
+            }
+
+            // 3. Store delivery metadata in localStorage for shared access (customer + admin)
+            localStorage.setItem(
+                `biteflow-order-meta-${orderId}`,
+                JSON.stringify({
+                    fullName,
+                    address,
+                    city,
+                    phoneNumber,
+                    paymentMethod,
+                    items: items.map((item) => ({
+                        id: item.id,
+                        name: item.name,
+                        price: item.price,
+                        quantity: item.quantity
+                    })),
+                    discountAmount,
+                    grandTotal,
+                    createdAt: new Date().toISOString()
+                })
+            );
+
+            // 4. Clear cart
             clearCart();
 
-            // 2. Display success toast matching BiteFlow system
-            toast.success("Order received successfully!", {
+            // 5. Display success toast matching BiteFlow system
+            toast.success("Order placed successfully!", {
                 style: {
                     border: '1px solid #10B981',
                     padding: '16px',
@@ -152,11 +219,13 @@ export default function CheckoutPage() {
                 },
             });
 
-            // 3. Redirect to success screen
-            router.push("/order-success");
+            // 6. Redirect to success screen
+            router.push(`/order-success?orderId=${orderId}`);
 
-        } catch {
-            toast.error("An error occurred while checkout was processing.", {
+        } catch (error) {
+            console.error("Checkout process error:", error);
+            const errMsg = error instanceof Error ? error.message : "An error occurred while checkout was processing.";
+            toast.error(errMsg, {
                 style: { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
             });
         } finally {

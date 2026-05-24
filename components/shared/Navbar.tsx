@@ -30,6 +30,7 @@ export default function Navbar() {
             const { data: { user } } = await supabase.auth.getUser();
             setUser(user);
             setIsAdmin(isUserAdmin(user));
+            useCartStore.getState().setUserId(user?.id || null);
         }
         fetchInitialSession();
 
@@ -38,6 +39,7 @@ export default function Navbar() {
             const currentUser = session?.user || null;
             setUser(currentUser);
             setIsAdmin(isUserAdmin(currentUser));
+            useCartStore.getState().setUserId(currentUser?.id || null);
         });
 
         return () => {
@@ -74,6 +76,11 @@ export default function Navbar() {
                         <Link href="/" className="text-gray-600 hover:text-orange-500 font-medium transition-colors">
                             Menu
                         </Link>
+                        {user && (
+                            <Link href="/orders" className="text-gray-600 hover:text-orange-500 font-medium transition-colors">
+                                My Orders
+                            </Link>
+                        )}
                         {isAdmin && (
                             <Link href="/admin" className="inline-flex items-center gap-1.5 text-gray-600 hover:text-orange-500 font-medium transition-colors">
                                 <Shield className="w-4 h-4 text-orange-500" />
@@ -100,14 +107,14 @@ export default function Navbar() {
                             <div className="hidden md:flex items-center gap-3">
                                 {user ? (
                                     <div className="flex items-center gap-3 bg-gray-50 pl-3 pr-2 py-1.5 rounded-xl border border-gray-100">
-                                        <div className="flex items-center gap-2">
+                                        <Link href="/profile" className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer" title="View Profile">
                                             <div className="w-6 h-6 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-xs font-bold uppercase">
                                                 {(user.user_metadata?.username || user.email || "U").charAt(0)}
                                             </div>
-                                            <span className="text-xs font-medium text-gray-600 max-w-[120px] truncate" title={user.user_metadata?.username || user.email}>
+                                            <span className="text-xs font-medium text-gray-600 max-w-[120px] truncate">
                                                 {user.user_metadata?.username || user.email}
                                             </span>
-                                        </div>
+                                        </Link>
                                         <button
                                             onClick={handleSignOut}
                                             title="Sign Out"
@@ -163,6 +170,15 @@ export default function Navbar() {
                     >
                         Menu
                     </Link>
+                    {user && (
+                        <Link
+                            href="/orders"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className="block px-3 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-orange-50 transition-colors"
+                        >
+                            My Orders
+                        </Link>
+                    )}
                     {isAdmin && (
                         <Link
                             href="/admin"
@@ -178,15 +194,22 @@ export default function Navbar() {
                         <div className="border-t border-gray-100 pt-3 mt-2">
                             {user ? (
                                 <div className="space-y-3 px-3">
-                                    <div className="flex items-center gap-2">
+                                    <Link 
+                                        href="/profile"
+                                        onClick={() => setIsMobileMenuOpen(false)}
+                                        className="flex items-center gap-2 hover:opacity-85 transition-opacity cursor-pointer text-left"
+                                        title="View Profile"
+                                    >
                                         <div className="w-8 h-8 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-sm font-bold uppercase">
                                             {(user.user_metadata?.username || user.email || "U").charAt(0)}
                                         </div>
                                         <div className="flex flex-col truncate">
                                             <span className="text-xs font-semibold text-gray-400">Logged in as</span>
-                                            <span className="text-sm font-bold text-gray-700 truncate" title={user.user_metadata?.username || user.email}>{user.user_metadata?.username || user.email}</span>
+                                            <span className="text-sm font-bold text-gray-700 truncate">
+                                                {user.user_metadata?.username || user.email}
+                                            </span>
                                         </div>
-                                    </div>
+                                    </Link>
                                     <button
                                         onClick={handleSignOut}
                                         className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"

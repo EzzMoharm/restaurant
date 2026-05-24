@@ -6,14 +6,52 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { isUserAdmin } from "@/lib/supabase/admin";
 import { User } from "@supabase/supabase-js";
-import { ShieldX, LogOut, ArrowLeft, PlusCircle, LayoutDashboard, Layers, ShoppingBag, AlertCircle } from "lucide-react";
-import toast from "react-hot-toast";
+import { ShieldX, LogOut, ArrowLeft, PlusCircle, LayoutDashboard, Layers, ShoppingBag, AlertCircle, Trash2, Truck, Calendar, RefreshCw } from "lucide-react";
 
 interface Category {
     id: string;
     name: string;
     slug: string;
 }
+
+interface Product {
+    id: string;
+    name: string;
+    price: number;
+    category_id: string;
+    image_url: string;
+    categories?: {
+        name: string;
+    } | null;
+}
+
+interface AdminOrderItem {
+    id: string;
+    quantity: number;
+    price_at_time: number;
+    product_id: string;
+    products: {
+        name: string;
+    } | null;
+}
+
+interface AdminOrder {
+    id: string;
+    total_price: number;
+    status: string;
+    created_at: string;
+    user_id: string | null;
+    order_items: AdminOrderItem[];
+}
+
+interface OrderDeliveryMeta {
+    fullName: string;
+    address: string;
+    city: string;
+    phoneNumber: string;
+    paymentMethod: string;
+}
+import toast from "react-hot-toast";
 
 export default function AdminPage() {
     const router = useRouter();
@@ -25,13 +63,20 @@ export default function AdminPage() {
     const [categoryName, setCategoryName] = useState("");
     const [productName, setProductName] = useState("");
     const [price, setPrice] = useState("");
+    const [imageUrl, setImageUrl] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("");
 
+    const [products, setProducts] = useState<Product[]>([]);
     const [isAddingCategory, setIsAddingCategory] = useState(false);
     const [isAddingProduct, setIsAddingProduct] = useState(false);
+    const [isDeletingProduct, setIsDeletingProduct] = useState<string | null>(null);
+    const [manageActiveCategory, setManageActiveCategory] = useState<string>("all");
 
     const [categoryErrors, setCategoryErrors] = useState<Record<string, string>>({});
     const [productErrors, setProductErrors] = useState<Record<string, string>>({});
+
+    const [orders, setOrders] = useState<AdminOrder[]>([]);
+    const [isLoadingOrders, setIsLoadingOrders] = useState<boolean>(false);
 
     // Run authentication and session check immediately
     useEffect(() => {
@@ -49,8 +94,10 @@ export default function AdminPage() {
                 setIsAdminState(adminCheck);
 
                 if (adminCheck) {
-                    // If authorized admin, fetch dashboard categories
+                    // If authorized admin, fetch dashboard categories and products
                     await fetchCategories();
+                    await fetchProducts();
+                    await fetchAllOrders();
                 }
             } catch (err) {
                 console.error("Auth validation error:", err);
@@ -88,6 +135,106 @@ export default function AdminPage() {
         if (data && data.length > 0) {
             setCategories(data);
             setSelectedCategory(data[0].id);
+        }
+    }
+
+    async function fetchProducts() {
+        const { data, error } = await supabase
+            .from("products")
+            .select("*, categories(name)");
+
+        if (error) {
+            toast.error("Database Error: " + error.message, {
+                style: { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
+            });
+            return;
+        }
+
+        if (data) {
+            setProducts(data);
+        }
+    }
+
+    async function fetchAllOrders() {
+        setIsLoadingOrders(true);
+        try {
+            const { data, error } = await supabase
+                .from("orders")
+                .select(`
+                    id,
+                    total_price,
+                    status,
+                    created_at,
+                    user_id,
+                    order_items (
+                        id,
+                        quantity,
+                        price_at_time,
+                        product_id,
+                        products (
+                            name
+                        )
+                    )
+                `)
+                .order("created_at", { ascending: false });
+
+            if (error) {
+                toast.error("Error loading orders: " + error.message);
+            } else if (data) {
+                setOrders((data as unknown as AdminOrder[]) || []);
+            }
+        } catch (err) {
+            console.error("Fetch all orders error:", err);
+            const errMsg = err instanceof Error ? err.message : "Error loading orders";
+            toast.error(errMsg);
+        } finally {
+            setIsLoadingOrders(false);
+        }
+    }
+
+    async function handleUpdateOrderStatus(orderId: string, newStatus: string) {
+        try {
+            const { error } = await supabase
+                .from("orders")
+                .update({ status: newStatus })
+                .eq("id", orderId);
+
+            if (error) {
+                toast.error("Fulfillment Error: " + error.message);
+            } else {
+                toast.success(`Fulfillment updated to: ${newStatus.toUpperCase()}`, {
+                    style: { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
+                });
+                fetchAllOrders();
+            }
+        } catch (err) {
+            console.error("Update status error:", err);
+            const errMsg = err instanceof Error ? err.message : "Fulfillment error";
+            toast.error(errMsg);
+        }
+    }
+
+    async function handleDeleteProduct(id: string) {
+        if (!confirm("Are you sure you want to delete this product?")) return;
+
+        setIsDeletingProduct(id);
+
+        const { error } = await supabase
+            .from("products")
+            .delete()
+            .eq("id", id);
+
+        setIsDeletingProduct(null);
+
+        if (error) {
+            toast.error("Error deleting product: " + error.message, {
+                style: { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C' }
+            });
+        } else {
+            fetchProducts();
+            toast.success("Product deleted successfully!", {
+                style: { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
+            });
         }
     }
 
@@ -135,6 +282,9 @@ export default function AdminPage() {
         } else if (isNaN(parseFloat(price)) || parseFloat(price) <= 0) {
             newErrors.price = "Please enter a valid price greater than 0.";
         }
+        if (imageUrl.trim() && !/^https?:\/\/.+/.test(imageUrl.trim())) {
+            newErrors.imageUrl = "Please enter a valid image URL (e.g. http:// or https://).";
+        }
         if (!selectedCategory) {
             newErrors.selectedCategory = "Please select a category.";
         }
@@ -149,12 +299,14 @@ export default function AdminPage() {
 
         setIsAddingProduct(true);
 
+        const finalImageUrl = imageUrl.trim() || "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=500";
+
         const { error } = await supabase.from("products").insert([
             {
                 name: productName.trim(),
                 price: parseFloat(price),
                 category_id: selectedCategory,
-                image_url: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=500",
+                image_url: finalImageUrl,
             },
         ]);
 
@@ -167,6 +319,8 @@ export default function AdminPage() {
         } else {
             setProductName("");
             setPrice("");
+            setImageUrl("");
+            fetchProducts();
             toast.success("Product added successfully!", {
                 style: { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
             });
@@ -250,6 +404,11 @@ export default function AdminPage() {
             </div>
         );
     }
+
+    // Filter products for administrative management list
+    const filteredManageProducts = manageActiveCategory === "all"
+        ? products
+        : products.filter((p) => p.category_id === manageActiveCategory);
 
     // 3. Render the Protected Dashboard if Authorized Admin
     return (
@@ -379,6 +538,30 @@ export default function AdminPage() {
                     </div>
 
                     <div className="space-y-1 md:col-span-2">
+                        <label className="text-xs font-semibold text-gray-500">Product Image URL (Optional)</label>
+                        <input
+                            type="text"
+                            placeholder="e.g. https://images.unsplash.com/photo-..."
+                            className={`w-full border p-3.5 rounded-xl text-gray-900 focus:outline-none focus:ring-2 transition-all font-medium placeholder-gray-400 ${
+                                productErrors.imageUrl
+                                    ? "border-red-300 focus:ring-red-500/20 focus:border-red-500"
+                                    : "border-gray-200 focus:ring-orange-500/20 focus:border-orange-500"
+                            }`}
+                            value={imageUrl}
+                            onChange={(e) => {
+                                setImageUrl(e.target.value);
+                                if (productErrors.imageUrl) setProductErrors(prev => ({ ...prev, imageUrl: "" }));
+                            }}
+                        />
+                        {productErrors.imageUrl && (
+                            <span className="text-xs font-bold text-red-500 flex items-center gap-1 mt-1.5 animate-fadeIn">
+                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                {productErrors.imageUrl}
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="space-y-1 md:col-span-2">
                         <label className="text-xs font-semibold text-gray-500">Select Category</label>
                         <select
                             className={`w-full border p-3.5 rounded-xl text-gray-900 focus:outline-none focus:ring-2 transition-all font-medium bg-white ${
@@ -426,6 +609,224 @@ export default function AdminPage() {
                         )}
                     </button>
                 </div>
+            </section>
+
+            {/* --- Manage Products Section --- */}
+            <section className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4 hover:shadow-md transition-shadow">
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <Trash2 className="w-5 h-5 text-red-500" />
+                    3. Manage & Delete Products
+                </h2>
+
+                {/* Category Pills Navigation Filter */}
+                {categories.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pb-3 border-b border-gray-100">
+                        <button
+                            onClick={() => setManageActiveCategory("all")}
+                            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                                manageActiveCategory === "all"
+                                    ? "bg-gray-900 text-white shadow-sm"
+                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            }`}
+                        >
+                            All
+                        </button>
+                        {categories.map((cat) => (
+                            <button
+                                key={cat.id}
+                                onClick={() => setManageActiveCategory(cat.id)}
+                                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                                    manageActiveCategory === cat.id
+                                        ? "bg-orange-500 text-white shadow-sm"
+                                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                }`}
+                            >
+                                {cat.name}
+                            </button>
+                        ))}
+                    </div>
+                )}
+                
+                {products.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-6">No products found in the menu.</p>
+                ) : filteredManageProducts.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-6">No products found in this category.</p>
+                ) : (
+                    <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto pr-1">
+                        {filteredManageProducts.map((prod) => (
+                            <div key={prod.id} className="flex items-center justify-between py-3.5 first:pt-0 last:pb-0 gap-4">
+                                <div className="flex items-center gap-3 truncate">
+                                    <div
+                                        className="w-12 h-12 rounded-xl bg-cover bg-center shrink-0 border border-gray-100"
+                                        style={{ backgroundImage: `url(${prod.image_url})` }}
+                                    />
+                                    <div className="truncate">
+                                        <h4 className="font-bold text-sm text-gray-900 truncate">{prod.name}</h4>
+                                        <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5">
+                                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-400" />
+                                            {prod.categories?.name || "Uncategorized"}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-4 shrink-0">
+                                    <span className="font-bold text-sm text-green-600">${prod.price.toFixed(2)}</span>
+                                    <button
+                                        onClick={() => handleDeleteProduct(prod.id)}
+                                        disabled={isDeletingProduct === prod.id}
+                                        className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition-all cursor-pointer disabled:opacity-50 border border-red-100/50 hover:border-red-200"
+                                        title="Delete Product"
+                                    >
+                                        {isDeletingProduct === prod.id ? (
+                                            <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                                        ) : (
+                                            <Trash2 className="w-4 h-4" />
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </section>
+
+            {/* --- Manage & Fulfill Orders Section --- */}
+            <section className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4 hover:shadow-md transition-shadow">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-gray-50 pb-3">
+                    <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                        <Truck className="w-5 h-5 text-orange-500" />
+                        4. Manage & Fulfill Orders
+                    </h2>
+                    <button
+                        onClick={fetchAllOrders}
+                        disabled={isLoadingOrders}
+                        className="inline-flex items-center gap-1 bg-gray-50 hover:bg-orange-50 hover:text-orange-500 border border-gray-200/60 text-gray-500 px-3 py-1.5 rounded-xl font-bold transition-all text-xs cursor-pointer disabled:opacity-50"
+                    >
+                        <RefreshCw className={`w-3 h-3 ${isLoadingOrders ? 'animate-spin' : ''}`} />
+                        Sync Orders
+                    </button>
+                </div>
+
+                {isLoadingOrders && orders.length === 0 ? (
+                    <div className="flex justify-center items-center py-10 space-y-2 flex-col">
+                        <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-xs text-gray-400 font-semibold animate-pulse">Syncing orders...</p>
+                    </div>
+                ) : orders.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-8">No customer orders found in the database.</p>
+                ) : (
+                    <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto pr-1 space-y-6">
+                        {orders.map((order) => {
+                            const orderRef = `BF-${order.id.substring(0, 5).toUpperCase()}`;
+                            const dateFormatted = new Date(order.created_at).toLocaleString([], {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            });
+
+                            // Try to retrieve address metadata from shared localStorage origin
+                            let metaData: OrderDeliveryMeta | null = null;
+                            if (typeof window !== "undefined") {
+                                const metaStr = localStorage.getItem(`biteflow-order-meta-${order.id}`);
+                                if (metaStr) {
+                                    metaData = JSON.parse(metaStr);
+                                }
+                            }
+
+                            return (
+                                <div key={order.id} className="pt-6 first:pt-0 space-y-3.5 text-left">
+                                    {/* Order Meta Header */}
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-gray-50/50 p-3 rounded-xl border border-gray-100/50">
+                                        <div className="space-y-0.5">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-extrabold text-gray-800 tracking-wide">{orderRef}</span>
+                                                <span className="text-[10px] font-bold text-gray-400 flex items-center gap-1">
+                                                    <Calendar className="w-3 h-3" />
+                                                    {dateFormatted}
+                                                </span>
+                                            </div>
+                                            <p className="text-[10px] text-gray-400 font-medium truncate max-w-[280px]">
+                                                Cust: <span className="font-semibold text-gray-600">{order.user_id || "Guest"}</span>
+                                            </p>
+                                        </div>
+
+                                        {/* Dropdown status changer */}
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">Status:</span>
+                                            <select
+                                                value={order.status}
+                                                onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)}
+                                                className="border border-gray-200 text-xs font-bold py-1.5 px-3 rounded-xl text-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all bg-white cursor-pointer"
+                                            >
+                                                <option value="pending">Pending</option>
+                                                <option value="preparing">Preparing</option>
+                                                <option value="ready">Ready</option>
+                                                <option value="delivering">Delivering</option>
+                                                <option value="delivered">Delivered</option>
+                                                <option value="cancelled">Cancelled</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Order Receipt and Delivery row */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                        {/* Left col: list items */}
+                                        <div className="space-y-1">
+                                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-0.5">Items</span>
+                                            <div className="bg-white rounded-xl border border-gray-100 p-3 divide-y divide-gray-50 space-y-1.5">
+                                                {order.order_items?.map((item, idx) => (
+                                                    <div key={idx} className="flex justify-between items-center py-1.5 first:pt-0 last:pb-0">
+                                                        <span className="font-medium text-gray-700">
+                                                            {item.products?.name || "Deleted Dish"} <span className="font-bold text-gray-500">x{item.quantity}</span>
+                                                        </span>
+                                                        <span className="font-bold text-gray-900">${(item.price_at_time * item.quantity).toFixed(2)}</span>
+                                                    </div>
+                                                ))}
+                                                <div className="flex justify-between border-t border-gray-50 pt-2 font-extrabold text-orange-600 text-sm">
+                                                    <span>Grand Total</span>
+                                                    <span>${order.total_price.toFixed(2)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Right col: Delivery metadata details */}
+                                        <div className="space-y-1">
+                                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-0.5">Delivery info</span>
+                                            <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-2 text-gray-600 font-medium">
+                                                {metaData ? (
+                                                    <>
+                                                        <div>
+                                                            <span className="text-[9px] font-bold text-gray-400 uppercase block tracking-wider">Recipient Name</span>
+                                                            <span className="text-gray-800 font-semibold text-xs">{metaData.fullName}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-[9px] font-bold text-gray-400 uppercase block tracking-wider">Recipient Destination</span>
+                                                            <span className="text-gray-800 text-xs">{metaData.address}, {metaData.city}</span>
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <div>
+                                                                <span className="text-[9px] font-bold text-gray-400 uppercase block tracking-wider">Recipient Phone</span>
+                                                                <span className="text-gray-800 text-xs">{metaData.phoneNumber}</span>
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-[9px] font-bold text-gray-400 uppercase block tracking-wider">Payment Method</span>
+                                                                <span className="text-gray-800 text-xs uppercase font-bold">{metaData.paymentMethod}</span>
+                                                            </div>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <div className="text-gray-400 text-xs text-center py-6 italic font-normal">
+                                                        No local metadata cache exists for this order. Showing placeholder defaults.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </section>
         </div>
     );

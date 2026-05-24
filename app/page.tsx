@@ -2,8 +2,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useCartStore } from "@/store/cart";
+import { User } from "@supabase/supabase-js";
 import toast from "react-hot-toast";
 
 // TypeScript interfaces for our data
@@ -21,13 +23,31 @@ interface Product {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
 
   // Bring in the Zustand cart action
   const addItem = useCartStore((state) => state.addItem);
+
+  useEffect(() => {
+    async function checkUserSession() {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    }
+    checkUserSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     async function fetchMenuData() {
@@ -118,8 +138,16 @@ export default function Home() {
                   </span>
                 </div>
 
-                <button
+                 <button
                   onClick={() => {
+                    if (!user) {
+                      toast.error("Please sign in to add items to your cart.", {
+                        style: { border: '1px solid #F59E0B', padding: '16px', color: '#B45309', fontWeight: 'bold' }
+                      });
+                      router.push("/login");
+                      return;
+                    }
+
                     addItem({
                       id: product.id,
                       name: product.name,

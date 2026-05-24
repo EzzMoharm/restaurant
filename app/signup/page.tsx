@@ -81,34 +81,22 @@ export default function SignupPage() {
             if (error) throw error;
 
             if (data.user) {
-                // Determine if they were automatically logged in (standard in dev or with email confirm off)
-                const { data: { session } } = await supabase.auth.getSession();
+                // Force real email confirmation by immediately signing out any auto-generated session
+                await supabase.auth.signOut();
                 
-                if (session) {
-                    toast.success("Welcome to BiteFlow! Account created successfully.", {
-                        style: {
-                            border: '1px solid #10B981',
-                            padding: '16px',
-                            color: '#047857',
-                            fontWeight: 'bold',
-                        },
-                        iconTheme: {
-                            primary: '#10B981',
-                            secondary: '#FFFAEE',
-                        },
-                    });
-                    router.push("/");
-                } else {
-                    toast.success("Account created! Please check your email to verify your registration.", {
-                        style: {
-                            border: '1px solid #10B981',
-                            padding: '16px',
-                            color: '#047857',
-                            fontWeight: 'bold',
-                        },
-                    });
-                    router.push("/login");
-                }
+                toast.success("Account created! Please check your email inbox to confirm your registration before signing in.", {
+                    style: {
+                        border: '1px solid #10B981',
+                        padding: '16px',
+                        color: '#047857',
+                        fontWeight: 'bold',
+                    },
+                    iconTheme: {
+                        primary: '#10B981',
+                        secondary: '#FFFAEE',
+                    },
+                });
+                router.push("/login");
             }
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : "Registration failed. Please check your credentials.";

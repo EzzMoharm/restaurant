@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
+import Link from "next/link";
 
 export default function CartSheet() {
     const router = useRouter();
@@ -70,9 +71,13 @@ export default function CartSheet() {
                     {items.length === 0 ? (
                         <div className="text-center text-gray-500 mt-10">
                             <p>Your cart is empty.</p>
-                            <button onClick={closeCart} className="mt-4 text-orange-500 font-medium hover:underline">
+                            <Link 
+                                href="/" 
+                                onClick={closeCart} 
+                                className="mt-4 inline-block text-orange-500 font-bold hover:underline cursor-pointer"
+                            >
                                 Browse Menu
-                            </button>
+                            </Link>
                         </div>
                     ) : (
                         items.map((item) => (
@@ -89,7 +94,7 @@ export default function CartSheet() {
                                     </span>
                                     <button
                                         onClick={() => removeItem(item.id)}
-                                        className="text-red-400 hover:text-red-600 transition-colors"
+                                        className="text-red-400 hover:text-red-600 transition-colors cursor-pointer"
                                     >
                                         <Trash2 className="w-4 h-4" />
                                     </button>

@@ -10,8 +10,11 @@ export interface CartItem {
 }
 
 interface CartState {
+  userId: string | null;
+  userCarts: Record<string, CartItem[]>; // Map of userId -> CartItem[]
   items: CartItem[];
   isOpen: boolean; // Controls the UI slide-out
+  setUserId: (userId: string | null) => void;
   addItem: (item: CartItem) => void;
   removeItem: (id: string) => void;
   clearCart: () => void;
@@ -24,26 +27,72 @@ interface CartState {
 export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
+      userId: null,
+      userCarts: {},
       items: [],
       isOpen: false,
-      
-      addItem: (item) => set((state) => {
-        const existingItem = state.items.find((i) => i.id === item.id);
-        if (existingItem) {
-          return {
-            items: state.items.map((i) =>
-              i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
-            ),
-          };
-        }
-        return { items: [...state.items, { ...item, quantity: 1 }] };
+
+      setUserId: (userId) => set((state) => {
+        const activeItems = userId ? (state.userCarts[userId] || []) : [];
+        return {
+          userId,
+          items: activeItems
+        };
       }),
       
-      removeItem: (id) => set((state) => ({
-        items: state.items.filter((i) => i.id !== id),
-      })),
+      addItem: (item) => set((state) => {
+        const currentUserId = state.userId;
+        if (!currentUserId) return {}; // Prevent modifications if not authenticated
+
+        const userActiveItems = state.userCarts[currentUserId] || [];
+        const existingItem = userActiveItems.find((i) => i.id === item.id);
+        
+        let newItems: CartItem[];
+        if (existingItem) {
+          newItems = userActiveItems.map((i) =>
+            i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+          );
+        } else {
+          newItems = [...userActiveItems, { ...item, quantity: 1 }];
+        }
+
+        return {
+          items: newItems,
+          userCarts: {
+            ...state.userCarts,
+            [currentUserId]: newItems
+          }
+        };
+      }),
       
-      clearCart: () => set({ items: [] }),
+      removeItem: (id) => set((state) => {
+        const currentUserId = state.userId;
+        if (!currentUserId) return {};
+
+        const userActiveItems = state.userCarts[currentUserId] || [];
+        const newItems = userActiveItems.filter((i) => i.id !== id);
+
+        return {
+          items: newItems,
+          userCarts: {
+            ...state.userCarts,
+            [currentUserId]: newItems
+          }
+        };
+      }),
+      
+      clearCart: () => set((state) => {
+        const currentUserId = state.userId;
+        if (!currentUserId) return { items: [] };
+
+        return {
+          items: [],
+          userCarts: {
+            ...state.userCarts,
+            [currentUserId]: []
+          }
+        };
+      }),
       
       totalItems: () => get().items.reduce((total, item) => total + item.quantity, 0),
       
@@ -53,9 +102,13 @@ export const useCartStore = create<CartState>()(
       closeCart: () => set({ isOpen: false }),
     }),
     {
-      name: 'biteflow-cart-storage',
-      // Don't persist the UI state (isOpen), only the cart data
-      partialize: (state) => ({ items: state.items }), 
+      name: 'biteflow-cart-storage-v2',
+      // Persist the userCarts map, active items, and userId
+      partialize: (state) => ({ 
+        userCarts: state.userCarts, 
+        items: state.items,
+        userId: state.userId
+      }), 
     }
   )
 );
