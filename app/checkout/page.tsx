@@ -7,7 +7,7 @@ import { useCartStore } from "@/store/cart";
 import { supabase } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import Link from "next/link";
-import { ArrowLeft, CreditCard, DollarSign, Gift, MapPin, Phone, ShieldCheck, ShoppingBag, User, AlertCircle } from "lucide-react";
+import { ArrowLeft, CreditCard, DollarSign, Gift, MapPin, Phone, ShoppingBag, User, AlertCircle } from "lucide-react";
 
 export default function CheckoutPage() {
     const router = useRouter();
@@ -215,7 +215,7 @@ export default function CheckoutPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 {/* Left Column - Delivery & Payment Form */}
-                <form onSubmit={handlePlaceOrder} noValidate className="lg:col-span-7 space-y-6">
+                <form id="checkout-form" onSubmit={handlePlaceOrder} noValidate className="lg:col-span-7 space-y-6">
                     {/* Delivery Details Card */}
                     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
                         <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2 border-b pb-3 border-gray-50">
@@ -461,11 +461,11 @@ export default function CheckoutPage() {
                         )}
                     </div>
 
-                    {/* Order Submit Button */}
+                    {/* Order Submit Button (Desktop Only) */}
                     <button
                         type="submit"
                         disabled={isPlacingOrder}
-                        className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold py-4 rounded-2xl transition-all shadow-md shadow-orange-500/20 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer text-base"
+                        className="hidden lg:flex w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold py-4 rounded-2xl transition-all shadow-md shadow-orange-500/20 disabled:opacity-50 items-center justify-center gap-2 cursor-pointer text-base"
                     >
                         {isPlacingOrder ? (
                             <>
@@ -558,6 +558,23 @@ export default function CheckoutPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Order Submit Button (Mobile Only) */}
+            <button
+                type="submit"
+                form="checkout-form"
+                disabled={isPlacingOrder}
+                className="flex lg:hidden w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold py-4 rounded-2xl transition-all shadow-md shadow-orange-500/20 disabled:opacity-50 items-center justify-center gap-2 cursor-pointer text-base mt-6"
+            >
+                {isPlacingOrder ? (
+                    <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Authenticating & Placing Order...
+                    </>
+                ) : (
+                    `Complete Order - $${grandTotal.toFixed(2)}`
+                )}
+            </button>
         </div>
     );
 }
