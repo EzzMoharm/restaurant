@@ -139,63 +139,75 @@ export default function Navbar() {
                 </div>
             </div>
 
+            {/* Backdrop for click-outside */}
+            <div
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`fixed inset-0 top-16 bg-black/40 backdrop-blur-xs z-30 transition-opacity duration-300 md:hidden ${
+                    isMobileMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+                }`}
+            />
+
             {/* Mobile Menu Dropdown UI */}
-            {isMobileMenuOpen && (
-                <div className="md:hidden bg-white border-t border-gray-100 shadow-lg absolute w-full z-40">
-                    <div className="px-4 pt-2 pb-6 space-y-2">
+            <div
+                className={`md:hidden bg-white border-t border-gray-100 shadow-lg absolute w-full left-0 right-0 z-40 transition-all duration-300 ease-out origin-top ${
+                    isMobileMenuOpen 
+                        ? "opacity-100 scale-y-100 translate-y-0 pointer-events-auto" 
+                        : "opacity-0 scale-y-95 -translate-y-2 pointer-events-none"
+                }`}
+            >
+                <div className="px-4 pt-2 pb-6 space-y-2">
+                    <Link
+                        href="/"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="block px-3 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-orange-50 transition-colors"
+                    >
+                        Menu
+                    </Link>
+                    {isAdmin && (
                         <Link
-                            href="/"
+                            href="/admin"
                             onClick={() => setIsMobileMenuOpen(false)}
-                            className="block px-3 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-orange-50 transition-colors"
+                            className="block px-3 py-3 rounded-xl text-base font-medium text-orange-600 hover:bg-orange-50 transition-colors"
                         >
-                            Menu
+                            Admin Dashboard
                         </Link>
-                        {isAdmin && (
-                            <Link
-                                href="/admin"
-                                onClick={() => setIsMobileMenuOpen(false)}
-                                className="block px-3 py-3 rounded-xl text-base font-medium text-orange-600 hover:bg-orange-50 transition-colors"
-                            >
-                                Admin Dashboard
-                            </Link>
-                        )}
-                        
-                        {/* Mobile Auth Button */}
-                        {isMounted && (
-                            <div className="border-t border-gray-100 pt-3 mt-2">
-                                {user ? (
-                                    <div className="space-y-3 px-3">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-8 h-8 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-sm font-bold uppercase">
-                                                {(user.user_metadata?.username || user.email || "U").charAt(0)}
-                                            </div>
-                                            <div className="flex flex-col truncate">
-                                                <span className="text-xs font-semibold text-gray-400">Logged in as</span>
-                                                <span className="text-sm font-bold text-gray-700 truncate" title={user.user_metadata?.username || user.email}>{user.user_metadata?.username || user.email}</span>
-                                            </div>
+                    )}
+                    
+                    {/* Mobile Auth Button */}
+                    {isMounted && (
+                        <div className="border-t border-gray-100 pt-3 mt-2">
+                            {user ? (
+                                <div className="space-y-3 px-3">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-sm font-bold uppercase">
+                                            {(user.user_metadata?.username || user.email || "U").charAt(0)}
                                         </div>
-                                        <button
-                                            onClick={handleSignOut}
-                                            className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
-                                        >
-                                            <LogOut className="w-4 h-4" />
-                                            Sign Out
-                                        </button>
+                                        <div className="flex flex-col truncate">
+                                            <span className="text-xs font-semibold text-gray-400">Logged in as</span>
+                                            <span className="text-sm font-bold text-gray-700 truncate" title={user.user_metadata?.username || user.email}>{user.user_metadata?.username || user.email}</span>
+                                        </div>
                                     </div>
-                                ) : (
-                                    <Link
-                                        href="/login"
-                                        onClick={() => setIsMobileMenuOpen(false)}
-                                        className="block px-3 py-3 rounded-xl text-base font-bold text-orange-600 hover:bg-orange-50 transition-colors"
+                                    <button
+                                        onClick={handleSignOut}
+                                        className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
                                     >
-                                        Sign In
-                                    </Link>
-                                )}
-                            </div>
-                        )}
-                    </div>
+                                        <LogOut className="w-4 h-4" />
+                                        Sign Out
+                                    </button>
+                                </div>
+                            ) : (
+                                <Link
+                                    href="/login"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className="block px-3 py-3 rounded-xl text-base font-bold text-orange-600 hover:bg-orange-50 transition-colors"
+                                >
+                                    Sign In
+                                </Link>
+                            )}
+                        </div>
+                    )}
                 </div>
-            )}
+            </div>
         </nav>
     );
 }
