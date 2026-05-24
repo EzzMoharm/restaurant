@@ -5,8 +5,12 @@
 import { useCartStore } from "@/store/cart";
 import { X, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase/client";
+import toast from "react-hot-toast";
 
 export default function CartSheet() {
+    const router = useRouter();
     const { items, isOpen, closeCart, removeItem, cartTotal } = useCartStore();
     const [isMounted, setIsMounted] = useState(false);
 
@@ -14,6 +18,27 @@ export default function CartSheet() {
     useEffect(() => {
         setIsMounted(true);
     }, []);
+
+    async function handleCheckout() {
+        try {
+            // 1. Check user login session
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            if (userError || !user) {
+                toast.error("Please sign in to place your order!", {
+                    style: { border: '1px solid #F59E0B', padding: '16px', color: '#B45309', fontWeight: 'bold' }
+                });
+                closeCart();
+                router.push("/login");
+                return;
+            }
+
+            // 2. Redirect to Checkout portal
+            closeCart();
+            router.push("/checkout");
+        } catch (error) {
+            console.error("Error navigating to checkout:", error);
+        }
+    }
 
     if (!isMounted) return null;
 
@@ -81,7 +106,10 @@ export default function CartSheet() {
                             <span>Total</span>
                             <span>${cartTotal().toFixed(2)}</span>
                         </div>
-                        <button className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-xl transition-colors shadow-sm">
+                        <button
+                            onClick={handleCheckout}
+                            className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                        >
                             Proceed to Checkout
                         </button>
                     </div>

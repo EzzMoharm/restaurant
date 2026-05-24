@@ -102,10 +102,10 @@ export default function Navbar() {
                                     <div className="flex items-center gap-3 bg-gray-50 pl-3 pr-2 py-1.5 rounded-xl border border-gray-100">
                                         <div className="flex items-center gap-2">
                                             <div className="w-6 h-6 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-xs font-bold uppercase">
-                                                {user.email?.charAt(0) || "U"}
+                                                {(user.user_metadata?.username || user.email || "U").charAt(0)}
                                             </div>
-                                            <span className="text-xs font-medium text-gray-600 max-w-[120px] truncate">
-                                                {user.email}
+                                            <span className="text-xs font-medium text-gray-600 max-w-[120px] truncate" title={user.user_metadata?.username || user.email}>
+                                                {user.user_metadata?.username || user.email}
                                             </span>
                                         </div>
                                         <button
@@ -118,11 +118,10 @@ export default function Navbar() {
                                     </div>
                                 ) : (
                                     <Link
-                                        href="/admin/login"
-                                        className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-orange-500 transition-colors py-1.5 px-3 rounded-xl hover:bg-orange-50/50"
+                                        href="/login"
+                                        className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-600 hover:text-orange-700 transition-colors py-2 px-4 rounded-xl bg-orange-50 hover:bg-orange-100/80 border border-orange-200/50"
                                     >
-                                        <Shield className="w-3.5 h-3.5" />
-                                        Admin Portal
+                                        Sign In
                                     </Link>
                                 )}
                             </div>
@@ -168,11 +167,11 @@ export default function Navbar() {
                                     <div className="space-y-3 px-3">
                                         <div className="flex items-center gap-2">
                                             <div className="w-8 h-8 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-sm font-bold uppercase">
-                                                {user.email?.charAt(0) || "U"}
+                                                {(user.user_metadata?.username || user.email || "U").charAt(0)}
                                             </div>
                                             <div className="flex flex-col truncate">
                                                 <span className="text-xs font-semibold text-gray-400">Logged in as</span>
-                                                <span className="text-sm font-bold text-gray-700 truncate">{user.email}</span>
+                                                <span className="text-sm font-bold text-gray-700 truncate" title={user.user_metadata?.username || user.email}>{user.user_metadata?.username || user.email}</span>
                                             </div>
                                         </div>
                                         <button
@@ -185,11 +184,11 @@ export default function Navbar() {
                                     </div>
                                 ) : (
                                     <Link
-                                        href="/admin/login"
+                                        href="/login"
                                         onClick={() => setIsMobileMenuOpen(false)}
-                                        className="block px-3 py-3 rounded-xl text-base font-medium text-gray-500 hover:text-orange-500 hover:bg-orange-50 transition-colors"
+                                        className="block px-3 py-3 rounded-xl text-base font-bold text-orange-600 hover:bg-orange-50 transition-colors"
                                     >
-                                        Admin Portal Login
+                                        Sign In
                                     </Link>
                                 )}
                             </div>

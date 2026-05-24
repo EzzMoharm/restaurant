@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { isUserAdmin } from "@/lib/supabase/admin";
 import { User } from "@supabase/supabase-js";
-import { ShieldX, LogOut, ArrowLeft, PlusCircle, LayoutDashboard, Layers, ShoppingBag } from "lucide-react";
+import { ShieldX, LogOut, ArrowLeft, PlusCircle, LayoutDashboard, Layers, ShoppingBag, AlertCircle } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface Category {
@@ -29,6 +29,9 @@ export default function AdminPage() {
 
     const [isAddingCategory, setIsAddingCategory] = useState(false);
     const [isAddingProduct, setIsAddingProduct] = useState(false);
+
+    const [categoryErrors, setCategoryErrors] = useState<Record<string, string>>({});
+    const [productErrors, setProductErrors] = useState<Record<string, string>>({});
 
     // Run authentication and session check immediately
     useEffect(() => {
@@ -89,7 +92,15 @@ export default function AdminPage() {
     }
 
     async function handleAddCategory() {
-        if (!categoryName) return toast.error("Please enter a category name");
+        setCategoryErrors({});
+        if (!categoryName.trim()) {
+            setCategoryErrors({ categoryName: "Please enter a category name." });
+            toast.error("Please fill out all category fields.", {
+                style: { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
+            });
+            return;
+        }
+
         setIsAddingCategory(true);
 
         const slug = categoryName.toLowerCase().replace(/ /g, "-");
@@ -113,14 +124,34 @@ export default function AdminPage() {
     }
 
     async function handleAddProduct() {
-        if (!productName || !price || !selectedCategory) {
-            return toast.error("Please fill in all product fields");
+        setProductErrors({});
+        const newErrors: Record<string, string> = {};
+
+        if (!productName.trim()) {
+            newErrors.productName = "Please enter a product name.";
         }
+        if (!price.trim()) {
+            newErrors.price = "Please enter a price.";
+        } else if (isNaN(parseFloat(price)) || parseFloat(price) <= 0) {
+            newErrors.price = "Please enter a valid price greater than 0.";
+        }
+        if (!selectedCategory) {
+            newErrors.selectedCategory = "Please select a category.";
+        }
+
+        if (Object.keys(newErrors).length > 0) {
+            setProductErrors(newErrors);
+            toast.error("Please fill in all product fields correctly.", {
+                style: { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
+            });
+            return;
+        }
+
         setIsAddingProduct(true);
 
         const { error } = await supabase.from("products").insert([
             {
-                name: productName,
+                name: productName.trim(),
                 price: parseFloat(price),
                 category_id: selectedCategory,
                 image_url: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=500",
@@ -248,18 +279,33 @@ export default function AdminPage() {
                     <Layers className="w-5 h-5 text-green-500" />
                     1. Add Category
                 </h2>
-                <div className="flex flex-col sm:flex-row gap-3">
-                    <input
-                        type="text"
-                        placeholder="e.g. Drinks, Pizzas, Desserts"
-                        className="border border-gray-200 p-3.5 rounded-xl flex-1 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all font-medium placeholder-gray-400"
-                        value={categoryName}
-                        onChange={(e) => setCategoryName(e.target.value)}
-                    />
+                <div className="flex flex-col sm:flex-row gap-3 items-start w-full">
+                    <div className="flex-1 w-full space-y-1">
+                        <input
+                            type="text"
+                            placeholder="e.g. Drinks, Pizzas, Desserts"
+                            className={`border p-3.5 rounded-xl w-full text-gray-900 focus:outline-none focus:ring-2 transition-all font-medium placeholder-gray-400 ${
+                                categoryErrors.categoryName
+                                    ? "border-red-300 focus:ring-red-500/20 focus:border-red-500"
+                                    : "border-gray-200 focus:ring-green-500/20 focus:border-green-500"
+                            }`}
+                            value={categoryName}
+                            onChange={(e) => {
+                                setCategoryName(e.target.value);
+                                if (categoryErrors.categoryName) setCategoryErrors(prev => ({ ...prev, categoryName: "" }));
+                            }}
+                        />
+                        {categoryErrors.categoryName && (
+                            <span className="text-xs font-bold text-red-500 flex items-center gap-1 mt-1.5 animate-fadeIn">
+                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                {categoryErrors.categoryName}
+                            </span>
+                        )}
+                    </div>
                     <button
                         onClick={handleAddCategory}
                         disabled={isAddingCategory}
-                        className="bg-green-600 hover:bg-green-700 text-white px-8 py-3.5 rounded-xl font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm shadow-green-600/10 cursor-pointer text-sm sm:text-base"
+                        className="bg-green-600 hover:bg-green-700 text-white px-8 py-3.5 rounded-xl font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm shadow-green-600/10 cursor-pointer text-sm sm:text-base w-full sm:w-auto h-[54px] self-stretch sm:self-start shrink-0"
                     >
                         {isAddingCategory ? (
                             <>
@@ -288,10 +334,23 @@ export default function AdminPage() {
                         <input
                             type="text"
                             placeholder="e.g. Double Cheeseburger"
-                            className="w-full border border-gray-200 p-3.5 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium placeholder-gray-400"
+                            className={`w-full border p-3.5 rounded-xl text-gray-900 focus:outline-none focus:ring-2 transition-all font-medium placeholder-gray-400 ${
+                                productErrors.productName
+                                    ? "border-red-300 focus:ring-red-500/20 focus:border-red-500"
+                                    : "border-gray-200 focus:ring-orange-500/20 focus:border-orange-500"
+                            }`}
                             value={productName}
-                            onChange={(e) => setProductName(e.target.value)}
+                            onChange={(e) => {
+                                setProductName(e.target.value);
+                                if (productErrors.productName) setProductErrors(prev => ({ ...prev, productName: "" }));
+                            }}
                         />
+                        {productErrors.productName && (
+                            <span className="text-xs font-bold text-red-500 flex items-center gap-1 mt-1.5 animate-fadeIn">
+                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                {productErrors.productName}
+                            </span>
+                        )}
                     </div>
 
                     <div className="space-y-1">
@@ -300,18 +359,38 @@ export default function AdminPage() {
                             type="number"
                             step="0.01"
                             placeholder="e.g. 12.50"
-                            className="w-full border border-gray-200 p-3.5 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium placeholder-gray-400"
+                            className={`w-full border p-3.5 rounded-xl text-gray-900 focus:outline-none focus:ring-2 transition-all font-medium placeholder-gray-400 ${
+                                productErrors.price
+                                    ? "border-red-300 focus:ring-red-500/20 focus:border-red-500"
+                                    : "border-gray-200 focus:ring-orange-500/20 focus:border-orange-500"
+                            }`}
                             value={price}
-                            onChange={(e) => setPrice(e.target.value)}
+                            onChange={(e) => {
+                                setPrice(e.target.value);
+                                if (productErrors.price) setProductErrors(prev => ({ ...prev, price: "" }));
+                            }}
                         />
+                        {productErrors.price && (
+                            <span className="text-xs font-bold text-red-500 flex items-center gap-1 mt-1.5 animate-fadeIn">
+                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                {productErrors.price}
+                            </span>
+                        )}
                     </div>
 
                     <div className="space-y-1 md:col-span-2">
                         <label className="text-xs font-semibold text-gray-500">Select Category</label>
                         <select
-                            className="w-full border border-gray-200 p-3.5 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium bg-white"
+                            className={`w-full border p-3.5 rounded-xl text-gray-900 focus:outline-none focus:ring-2 transition-all font-medium bg-white ${
+                                productErrors.selectedCategory
+                                    ? "border-red-300 focus:ring-red-500/20 focus:border-red-500"
+                                    : "border-gray-200 focus:ring-orange-500/20 focus:border-orange-500"
+                            }`}
                             value={selectedCategory}
-                            onChange={(e) => setSelectedCategory(e.target.value)}
+                            onChange={(e) => {
+                                setSelectedCategory(e.target.value);
+                                if (productErrors.selectedCategory) setProductErrors(prev => ({ ...prev, selectedCategory: "" }));
+                            }}
                         >
                             {categories.length === 0 ? (
                                 <option value="">Loading categories...</option>
@@ -321,6 +400,12 @@ export default function AdminPage() {
                                 ))
                             )}
                         </select>
+                        {productErrors.selectedCategory && (
+                            <span className="text-xs font-bold text-red-500 flex items-center gap-1 mt-1.5 animate-fadeIn">
+                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                {productErrors.selectedCategory}
+                            </span>
+                        )}
                     </div>
 
                     <button
