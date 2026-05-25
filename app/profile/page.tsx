@@ -227,7 +227,7 @@ export default function CustomerProfilePage() {
 
             {/* Header section */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-100 dark:border-[#22222e] pb-5 relative z-10">
-                <div className="space-y-1 text-left">
+                <div className="space-y-1 text-start">
                     <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight flex items-center gap-2">
                         <UserIcon className="w-8 h-8 text-orange-500" />
                         {t.profileTitle}
@@ -326,7 +326,7 @@ export default function CustomerProfilePage() {
 
                 {/* Right Column: Profile Edit Form */}
                 <form onSubmit={handleSaveChanges} className="lg:col-span-8 space-y-6">
-                    <div className="bg-white dark:bg-[#121216]/90 p-6 sm:p-8 rounded-3xl border border-gray-100 dark:border-[#22222e] shadow-sm space-y-6 text-left">
+                    <div className="bg-white dark:bg-[#121216]/90 p-6 sm:p-8 rounded-3xl border border-gray-100 dark:border-[#22222e] shadow-sm space-y-6 text-start">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 border-b pb-3 border-gray-50 dark:border-[#22222e]/40 flex items-center gap-2">
                             <UserIcon className="w-5 h-5 text-orange-500" />
                             {t.profileSectionPersonal}
