@@ -415,7 +415,7 @@ export default function CustomerProfilePage() {
                                         setPhoneNumber(e.target.value);
                                         if (errors.phoneNumber) setErrors(prev => ({ ...prev, phoneNumber: "" }));
                                     }}
-                                    className={`w-full border p-3.5 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 bg-gray-50/50 dark:bg-[#161622]/50 focus:bg-white dark:focus:bg-[#121216] focus:outline-none focus:ring-2 transition-all font-medium ${
+                                    className={`w-full border p-3.5 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 bg-gray-50/50 dark:bg-[#161622]/50 focus:bg-white dark:focus:bg-[#121216] focus:outline-none focus:ring-2 transition-all font-medium text-start ${
                                         errors.phoneNumber 
                                             ? "border-red-300 dark:border-red-900/50 focus:ring-red-500/20 focus:border-red-500" 
                                             : "border-gray-200 dark:border-[#22222e] focus:ring-orange-500/20 focus:border-orange-500"
