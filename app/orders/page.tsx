@@ -145,6 +145,32 @@ export default function CustomerOrdersPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [router, lang]);
 
+    // Realtime subscription for live order status updates (Feature 1)
+    useEffect(() => {
+        if (!userId) return;
+
+        const channel = supabase
+            .channel(`customer-orders-${userId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'orders',
+                    filter: `user_id=eq.${userId}`
+                },
+                () => {
+                    fetchUserOrders(userId);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userId]);
+
     async function fetchUserOrders(uid: string) {
         setIsLoadingOrders(true);
         try {
@@ -449,11 +475,24 @@ export default function CustomerOrdersPage() {
                                                 </span>
                                             </div>
 
-                                            {/* Status Pill & Expand Caret */}
-                                            <div className="flex items-center gap-3">
+                                            {/* Status Pill, Quick Reorder & Expand Caret */}
+                                            <div className="flex items-center gap-2">
                                                 <span className={`text-[10px] uppercase py-0.5 px-2.5 rounded-full tracking-wider font-extrabold ${getStatusBadgeClass(order.status)}`}>
                                                     {getStatusStepLabel(order.status)}
                                                 </span>
+                                                {order.status === 'delivered' && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleReorder(order);
+                                                        }}
+                                                        disabled={isReordering}
+                                                        className="text-[10px] uppercase py-0.5 px-2.5 rounded-full tracking-wider font-extrabold bg-orange-50 dark:bg-orange-950/20 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-900/40 hover:bg-orange-100 dark:hover:bg-orange-950/40 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                                                    >
+                                                        <RefreshCw className={`w-2.5 h-2.5 ${isReordering ? 'animate-spin' : ''}`} />
+                                                        {t.ordersQuickReorder}
+                                                    </button>
+                                                )}
                                                 {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400 dark:text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500" />}
                                             </div>
                                         </div>

@@ -129,7 +129,7 @@ export default function OrderSuccessPage() {
                     setOrderStatus(data.status);
                     setTotalPrice(data.total_price);
                     if (data.order_items) {
-                        const mappedItems = data.order_items.map((item: any) => {
+                        const mappedItems = data.order_items.map((item: { id: string; quantity: number; price_at_time: number; product_id: string; products: { name: string; image_url: string } | { name: string; image_url: string }[] | null }) => {
                             let productObj = null;
                             if (item.products) {
                                 if (Array.isArray(item.products)) {
@@ -166,36 +166,43 @@ export default function OrderSuccessPage() {
 
         fetchOrderDetails();
 
-        // 2. Poll for status updates every 5 seconds
-        const interval = setInterval(async () => {
-            const { data, error } = await supabase
-                .from("orders")
-                .select("status")
-                .eq("id", orderId)
-                .single();
-
-            if (!error && data) {
-                if (data.status !== orderStatus) {
-                    setOrderStatus(data.status);
-                    toast.success(
-                        lang === 'ar'
-                            ? `حالة الطلب الحالية: ${getStatusLabel(data.status)}`
-                            : `Order status: ${getStatusLabel(data.status)}`,
-                        {
-                            style: {
-                                border: '1px solid #F59E0B',
-                                padding: '12px',
-                                color: '#78350F',
-                                fontWeight: 'bold',
-                                fontSize: '14px'
+        // 2. Real-time subscription for instant status updates
+        const channel = supabase
+            .channel(`order-track-${orderId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'orders',
+                    filter: `id=eq.${orderId}`
+                },
+                (payload) => {
+                    const newStatus = (payload.new as { status: string }).status;
+                    if (newStatus && newStatus !== orderStatus) {
+                        setOrderStatus(newStatus);
+                        toast.success(
+                            lang === 'ar'
+                                ? `حالة الطلب الحالية: ${getStatusLabel(newStatus)}`
+                                : `Order status: ${getStatusLabel(newStatus)}`,
+                            {
+                                style: {
+                                    border: '1px solid #F59E0B',
+                                    padding: '12px',
+                                    color: '#78350F',
+                                    fontWeight: 'bold',
+                                    fontSize: '14px'
+                                }
                             }
-                        }
-                    );
+                        );
+                    }
                 }
-            }
-        }, 5000);
+            )
+            .subscribe();
 
-        return () => clearInterval(interval);
+        return () => {
+            supabase.removeChannel(channel);
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [orderId, orderStatus, lang]);
 
@@ -318,7 +325,7 @@ export default function OrderSuccessPage() {
                             {/* Live Sync pulsing tag */}
                             <div className="absolute top-6 right-6 inline-flex items-center gap-1.5 bg-orange-50 dark:bg-orange-950/20 text-orange-600 dark:text-orange-400 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider animate-pulse border border-orange-100 dark:border-orange-900/40">
                                 <RefreshCw className="w-2.5 h-2.5 animate-spin" />
-                                {lang === 'ar' ? "تحديث مباشر" : "Live Polling"}
+                                {lang === 'ar' ? "تحديث فوري" : "Live Sync"}
                             </div>
 
                             <div className="space-y-1 text-left">

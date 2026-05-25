@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { isUserAdmin } from "@/lib/supabase/admin";
 import { User } from "@supabase/supabase-js";
-import { ShieldX, LogOut, ArrowLeft, PlusCircle, LayoutDashboard, Layers, ShoppingBag, AlertCircle, Trash2, Truck, Calendar, RefreshCw, ChevronDown } from "lucide-react";
+import { ShieldX, LogOut, ArrowLeft, PlusCircle, LayoutDashboard, Layers, ShoppingBag, AlertCircle, Trash2, Truck, Calendar, RefreshCw, ChevronDown, Clock, Flame, PackageCheck, CircleCheckBig, Ban, TrendingUp, Activity, BarChart3, Crown, Tag, Plus } from "lucide-react";
 import toast from "react-hot-toast";
 import { useTranslation, translateMenu } from "@/lib/translations";
 import { useSettingsStore } from "@/store/settings";
@@ -23,6 +23,7 @@ interface Product {
     price: number;
     category_id: string;
     image_url: string;
+    is_available: boolean;
     categories?: {
         name: string;
     } | null;
@@ -112,6 +113,8 @@ interface StatusOption {
     labelAr: string;
     colorClass: string;
     darkColorClass: string;
+    icon: React.ReactNode;
+    dotColor: string;
 }
 
 const statusOptions: StatusOption[] = [
@@ -120,42 +123,54 @@ const statusOptions: StatusOption[] = [
         labelEn: "Pending",
         labelAr: "قيد الانتظار",
         colorClass: "bg-orange-50 text-orange-700 border-orange-250 hover:bg-orange-100",
-        darkColorClass: "dark:bg-orange-950/20 dark:text-orange-400 dark:border-orange-900/35 dark:hover:bg-orange-950/30"
+        darkColorClass: "dark:bg-orange-950/20 dark:text-orange-400 dark:border-orange-900/35 dark:hover:bg-orange-950/30",
+        icon: <Clock className="w-3.5 h-3.5" />,
+        dotColor: "bg-orange-400"
     },
     {
         value: "preparing",
         labelEn: "Preparing",
         labelAr: "قيد التحضير",
         colorClass: "bg-blue-50 text-blue-700 border-blue-250 hover:bg-blue-100",
-        darkColorClass: "dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900/35 dark:hover:bg-blue-950/30"
+        darkColorClass: "dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900/35 dark:hover:bg-blue-950/30",
+        icon: <Flame className="w-3.5 h-3.5" />,
+        dotColor: "bg-blue-400"
     },
     {
         value: "ready",
         labelEn: "Ready",
         labelAr: "جاهز للاستلام",
         colorClass: "bg-purple-50 text-purple-700 border-purple-250 hover:bg-purple-100",
-        darkColorClass: "dark:bg-purple-950/20 dark:text-purple-400 dark:border-purple-900/35 dark:hover:bg-purple-950/30"
+        darkColorClass: "dark:bg-purple-950/20 dark:text-purple-400 dark:border-purple-900/35 dark:hover:bg-purple-950/30",
+        icon: <PackageCheck className="w-3.5 h-3.5" />,
+        dotColor: "bg-purple-400"
     },
     {
         value: "delivering",
         labelEn: "Delivering",
         labelAr: "جاري التوصيل",
         colorClass: "bg-indigo-50 text-indigo-700 border-indigo-250 hover:bg-indigo-100",
-        darkColorClass: "dark:bg-indigo-950/20 dark:text-indigo-400 dark:border-indigo-900/35 dark:hover:bg-indigo-950/30"
+        darkColorClass: "dark:bg-indigo-950/20 dark:text-indigo-400 dark:border-indigo-900/35 dark:hover:bg-indigo-950/30",
+        icon: <Truck className="w-3.5 h-3.5" />,
+        dotColor: "bg-indigo-400"
     },
     {
         value: "delivered",
         labelEn: "Delivered",
         labelAr: "تم التوصيل",
         colorClass: "bg-emerald-50 text-emerald-700 border-emerald-250 hover:bg-emerald-100",
-        darkColorClass: "dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/35 dark:hover:bg-emerald-950/30"
+        darkColorClass: "dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/35 dark:hover:bg-emerald-950/30",
+        icon: <CircleCheckBig className="w-3.5 h-3.5" />,
+        dotColor: "bg-emerald-400"
     },
     {
         value: "cancelled",
         labelEn: "Cancelled",
         labelAr: "تم الإلغاء",
         colorClass: "bg-rose-50 text-rose-700 border-rose-250 hover:bg-rose-100",
-        darkColorClass: "dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/35 dark:hover:bg-rose-950/30"
+        darkColorClass: "dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/35 dark:hover:bg-rose-950/30",
+        icon: <Ban className="w-3.5 h-3.5" />,
+        dotColor: "bg-rose-400"
     }
 ];
 
@@ -187,6 +202,28 @@ export default function AdminPage() {
     const [isLoadingOrders, setIsLoadingOrders] = useState<boolean>(false);
     const [activeDropdownOrderId, setActiveDropdownOrderId] = useState<string | null>(null);
 
+    // Coupon Management State (Feature 4)
+    interface Coupon {
+        id: string;
+        code: string;
+        discount_type: string;
+        discount_value: number;
+        is_active: boolean;
+        expiry_date: string | null;
+        min_order_amount: number;
+        max_uses: number | null;
+        current_uses: number;
+        created_at: string;
+    }
+    const [coupons, setCoupons] = useState<Coupon[]>([]);
+    const [couponCode, setCouponCode] = useState("");
+    const [couponType, setCouponType] = useState<"percentage" | "fixed">("percentage");
+    const [couponValue, setCouponValue] = useState("");
+    const [couponExpiry, setCouponExpiry] = useState("");
+    const [couponMinOrder, setCouponMinOrder] = useState("");
+    const [couponMaxUses, setCouponMaxUses] = useState("");
+    const [isAddingCoupon, setIsAddingCoupon] = useState(false);
+
     // Run authentication and session check immediately
     useEffect(() => {
         async function checkSession() {
@@ -205,6 +242,7 @@ export default function AdminPage() {
                     await fetchCategories();
                     await fetchProducts();
                     await fetchAllOrders();
+                    await fetchCoupons();
                 }
             } catch (err) {
                 console.error("Auth validation error:", err);
@@ -228,6 +266,45 @@ export default function AdminPage() {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [router]);
+
+    // Realtime subscription for live order updates (Feature 1)
+    useEffect(() => {
+        if (!isAdminState) return;
+
+        const channel = supabase
+            .channel('admin-orders-realtime')
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'orders' },
+                () => {
+                    fetchAllOrders();
+                    toast.success(
+                        lang === 'ar' ? "تم استلام طلب جديد!" : "New order received!",
+                        {
+                            style: {
+                                border: '1px solid #10B981',
+                                padding: '16px',
+                                color: '#047857',
+                                fontWeight: 'bold'
+                            }
+                        }
+                    );
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'orders' },
+                () => {
+                    fetchAllOrders();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAdminState, lang]);
 
     async function fetchCategories() {
         const isDark = useSettingsStore.getState().theme === "dark";
@@ -377,6 +454,114 @@ export default function AdminPage() {
                         : { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
                 }
             );
+        }
+    }
+
+    async function handleToggleAvailability(productId: string, currentAvailability: boolean) {
+        const newAvailability = !currentAvailability;
+        const { error } = await supabase
+            .from("products")
+            .update({ is_available: newAvailability })
+            .eq("id", productId);
+
+        if (error) {
+            toast.error(
+                (lang === 'ar' ? "خطأ في تحديث حالة المنتج: " : "Error updating availability: ") + error.message
+            );
+        } else {
+            setProducts(prev => prev.map(p => p.id === productId ? { ...p, is_available: newAvailability } : p));
+            toast.success(
+                newAvailability
+                    ? (lang === 'ar' ? "المنتج متاح الآن!" : "Product is now available!")
+                    : (lang === 'ar' ? "المنتج غير متاح حالياً." : "Product marked as out of stock."),
+                {
+                    style: {
+                        border: `1px solid ${newAvailability ? '#10B981' : '#F59E0B'}`,
+                        padding: '16px',
+                        color: newAvailability ? '#047857' : '#B45309',
+                        fontWeight: 'bold'
+                    }
+                }
+            );
+        }
+    }
+
+    // Coupon CRUD Functions (Feature 4)
+    async function fetchCoupons() {
+        const { data, error } = await supabase
+            .from("coupons")
+            .select("*")
+            .order("created_at", { ascending: false });
+
+        if (!error && data) {
+            setCoupons(data);
+        }
+    }
+
+    async function handleAddCoupon() {
+        if (!couponCode.trim() || !couponValue.trim()) {
+            toast.error(lang === 'ar' ? "يرجى ملء حقل الكود والقيمة." : "Please fill in the code and value fields.");
+            return;
+        }
+
+        setIsAddingCoupon(true);
+
+        const insertData: Record<string, unknown> = {
+            code: couponCode.trim().toUpperCase(),
+            discount_type: couponType,
+            discount_value: parseFloat(couponValue),
+            is_active: true,
+            min_order_amount: couponMinOrder ? parseFloat(couponMinOrder) : 0,
+            max_uses: couponMaxUses ? parseInt(couponMaxUses) : null,
+            expiry_date: couponExpiry || null,
+        };
+
+        const { error } = await supabase.from("coupons").insert(insertData);
+
+        if (error) {
+            toast.error(
+                (lang === 'ar' ? "خطأ في إنشاء الكوبون: " : "Error creating coupon: ") + error.message
+            );
+        } else {
+            toast.success(lang === 'ar' ? "تم إنشاء الكوبون بنجاح!" : "Coupon created successfully!", {
+                style: { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
+            });
+            setCouponCode("");
+            setCouponValue("");
+            setCouponExpiry("");
+            setCouponMinOrder("");
+            setCouponMaxUses("");
+            fetchCoupons();
+        }
+
+        setIsAddingCoupon(false);
+    }
+
+    async function handleToggleCoupon(couponId: string, currentActive: boolean) {
+        const { error } = await supabase
+            .from("coupons")
+            .update({ is_active: !currentActive })
+            .eq("id", couponId);
+
+        if (error) {
+            toast.error((lang === 'ar' ? "خطأ في تحديث الكوبون: " : "Error updating coupon: ") + error.message);
+        } else {
+            setCoupons(prev => prev.map(c => c.id === couponId ? { ...c, is_active: !currentActive } : c));
+        }
+    }
+
+    async function handleDeleteCoupon(couponId: string) {
+        const confirmMsg = lang === 'ar' ? "هل أنت متأكد من حذف هذا الكوبون؟" : "Are you sure you want to delete this coupon?";
+        if (!confirm(confirmMsg)) return;
+
+        const { error } = await supabase.from("coupons").delete().eq("id", couponId);
+        if (error) {
+            toast.error((lang === 'ar' ? "خطأ في حذف الكوبون: " : "Error deleting coupon: ") + error.message);
+        } else {
+            setCoupons(prev => prev.filter(c => c.id !== couponId));
+            toast.success(lang === 'ar' ? "تم حذف الكوبون." : "Coupon deleted.", {
+                style: { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
+            });
         }
     }
 
@@ -633,6 +818,99 @@ export default function AdminPage() {
                 </button>
             </div>
 
+            {/* --- Business Analytics Section (Feature 3) --- */}
+            {(() => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                const deliveredOrders = orders.filter(o => o.status === 'delivered');
+                const todayDelivered = deliveredOrders.filter(o => {
+                    const d = new Date(o.created_at);
+                    d.setHours(0, 0, 0, 0);
+                    return d.getTime() === today.getTime();
+                });
+                const todayRevenue = todayDelivered.reduce((sum, o) => sum + o.total_price, 0);
+
+                const activeOrderCount = orders.filter(o =>
+                    ['pending', 'preparing', 'ready', 'delivering'].includes(o.status)
+                ).length;
+
+                const totalSalesCount = deliveredOrders.length;
+
+                // Calculate most popular item from order_items
+                const itemFrequency: Record<string, { name: string; count: number }> = {};
+                orders.forEach(order => {
+                    order.order_items?.forEach(item => {
+                        const name = item.products?.name || 'Unknown';
+                        if (!itemFrequency[name]) {
+                            itemFrequency[name] = { name, count: 0 };
+                        }
+                        itemFrequency[name].count += item.quantity;
+                    });
+                });
+                const popularItem = Object.values(itemFrequency).sort((a, b) => b.count - a.count)[0];
+
+                const analyticsCards = [
+                    {
+                        label: t.adminRevenue,
+                        value: `$${todayRevenue.toFixed(2)}`,
+                        icon: <TrendingUp className="w-5 h-5" />,
+                        gradient: 'from-emerald-500/10 to-green-500/10 dark:from-emerald-950/30 dark:to-green-950/30',
+                        iconBg: 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400',
+                        borderColor: 'border-emerald-100 dark:border-emerald-900/30'
+                    },
+                    {
+                        label: t.adminActiveOrders,
+                        value: `${activeOrderCount}`,
+                        icon: <Activity className="w-5 h-5" />,
+                        gradient: 'from-blue-500/10 to-indigo-500/10 dark:from-blue-950/30 dark:to-indigo-950/30',
+                        iconBg: 'bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400',
+                        borderColor: 'border-blue-100 dark:border-blue-900/30'
+                    },
+                    {
+                        label: t.adminTotalSales,
+                        value: `${totalSalesCount}`,
+                        icon: <BarChart3 className="w-5 h-5" />,
+                        gradient: 'from-violet-500/10 to-purple-500/10 dark:from-violet-950/30 dark:to-purple-950/30',
+                        iconBg: 'bg-violet-100 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400',
+                        borderColor: 'border-violet-100 dark:border-violet-900/30'
+                    },
+                    {
+                        label: t.adminPopularItem,
+                        value: popularItem ? translateMenu(popularItem.name, lang) : (t.adminNoSalesYet),
+                        icon: <Crown className="w-5 h-5" />,
+                        gradient: 'from-amber-500/10 to-orange-500/10 dark:from-amber-950/30 dark:to-orange-950/30',
+                        iconBg: 'bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400',
+                        borderColor: 'border-amber-100 dark:border-amber-900/30'
+                    }
+                ];
+
+                return (
+                    <section className="relative z-10 space-y-4">
+                        <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2 text-start">
+                            <BarChart3 className="w-5 h-5 text-orange-500" />
+                            {t.adminAnalyticsTitle}
+                        </h2>
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                            {analyticsCards.map((card, idx) => (
+                                <div
+                                    key={idx}
+                                    className={`bg-gradient-to-br ${card.gradient} backdrop-blur-sm p-5 rounded-2xl border ${card.borderColor} shadow-sm hover:shadow-md transition-all space-y-3`}
+                                >
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${card.iconBg}`}>
+                                        {card.icon}
+                                    </div>
+                                    <div className="space-y-0.5 text-start">
+                                        <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{card.label}</p>
+                                        <p className="text-xl font-extrabold text-gray-900 dark:text-gray-100 truncate">{card.value}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                );
+            })()}
+
             {/* --- Category Section --- */}
             <section className="bg-white dark:bg-[#121216]/90 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-[#22222e] space-y-4 hover:shadow-md transition-shadow relative z-10">
                 <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2 border-b pb-2.5 border-gray-50 dark:border-[#22222e]/40">
@@ -875,7 +1153,28 @@ export default function AdminPage() {
                                         </p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-4 shrink-0">
+                                <div className="flex items-center gap-3 shrink-0">
+                                    {/* Availability Toggle */}
+                                    <button
+                                        onClick={() => handleToggleAvailability(prod.id, prod.is_available)}
+                                        className={`relative w-10 h-5.5 rounded-full transition-colors duration-300 cursor-pointer ${
+                                            prod.is_available !== false
+                                                ? 'bg-emerald-500'
+                                                : 'bg-gray-300 dark:bg-gray-600'
+                                        }`}
+                                        title={prod.is_available !== false ? t.adminToggleAvailable : t.adminToggleUnavailable}
+                                    >
+                                        <span className={`absolute top-0.5 w-4.5 h-4.5 bg-white rounded-full shadow-sm transition-all duration-300 ${
+                                            prod.is_available !== false ? 'left-5' : 'left-0.5'
+                                        }`} />
+                                    </button>
+                                    <span className={`text-[10px] font-bold uppercase tracking-wide min-w-[52px] text-center ${
+                                        prod.is_available !== false
+                                            ? 'text-emerald-600 dark:text-emerald-400'
+                                            : 'text-gray-400 dark:text-gray-500'
+                                    }`}>
+                                        {prod.is_available !== false ? t.adminToggleAvailable : t.adminToggleUnavailable}
+                                    </span>
                                     <span className="font-bold text-sm text-green-600 dark:text-green-400">${prod.price.toFixed(2)}</span>
                                     <button
                                         onClick={() => handleDeleteProduct(prod.id)}
@@ -967,43 +1266,76 @@ export default function AdminPage() {
                                             
                                             <button
                                                 onClick={() => setActiveDropdownOrderId(activeDropdownOrderId === order.id ? null : order.id)}
-                                                className={`flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all duration-300 shadow-xs cursor-pointer select-none ${
+                                                className={`flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all duration-300 shadow-xs cursor-pointer select-none ${
                                                     statusOptions.find(opt => opt.value === order.status)?.colorClass || ""
                                                 } ${
                                                     statusOptions.find(opt => opt.value === order.status)?.darkColorClass || ""
                                                 }`}
                                             >
-                                                <span>{getStatusLabel(order.status)}</span>
+                                                <span className="flex items-center gap-1.5">
+                                                    {statusOptions.find(opt => opt.value === order.status)?.icon}
+                                                    {getStatusLabel(order.status)}
+                                                </span>
                                                 <ChevronDown className={`w-3.5 h-3.5 opacity-70 transition-transform duration-300 ${activeDropdownOrderId === order.id ? 'rotate-180' : ''}`} />
                                             </button>
 
                                              {activeDropdownOrderId === order.id && (
                                                  <>
                                                      <div 
-                                                         className="fixed inset-0 z-40" 
+                                                         className="fixed inset-0 z-40 bg-black/5 dark:bg-black/15 backdrop-blur-[1px]" 
                                                          onClick={() => setActiveDropdownOrderId(null)} 
                                                      />
                                                      
-                                                     <div className={`absolute top-full ${lang === 'ar' ? 'left-0' : 'right-0'} mt-1.5 w-44 rounded-2xl bg-white dark:bg-[#1a1a24] border border-gray-100 dark:border-[#2b2b3b]/60 shadow-xl py-2 z-50 animate-fadeIn overflow-hidden`}>
-                                                         {statusOptions.map((opt) => (
-                                                             <button
-                                                                 key={opt.value}
-                                                                 onClick={() => {
-                                                                     handleUpdateOrderStatus(order.id, opt.value);
-                                                                     setActiveDropdownOrderId(null);
-                                                                 }}
-                                                                 className={`w-full text-start px-4 py-2 text-xs font-bold transition-colors flex items-center justify-between cursor-pointer ${
-                                                                     order.status === opt.value
-                                                                         ? "bg-orange-50 text-orange-600 dark:bg-orange-950/20 dark:text-orange-400"
-                                                                         : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-[#232333]/50"
-                                                                 }`}
-                                                             >
-                                                                 <span>{lang === 'ar' ? opt.labelAr : opt.labelEn}</span>
-                                                                 {order.status === opt.value && (
-                                                                     <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                                                                 )}
-                                                             </button>
-                                                         ))}
+                                                     <div 
+                                                         className={`absolute top-full ${lang === 'ar' ? 'left-0' : 'right-0'} mt-2 w-52 rounded-2xl bg-white/95 dark:bg-[#1a1a24]/95 backdrop-blur-xl border border-gray-200/70 dark:border-[#2b2b3b]/60 shadow-2xl z-50 overflow-hidden`}
+                                                         style={{ animation: 'dropdownSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}
+                                                     >
+                                                         {/* Dropdown header */}
+                                                         <div className="px-4 py-2.5 border-b border-gray-100 dark:border-[#2b2b3b]/40">
+                                                             <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                                                                 {lang === 'ar' ? 'تغيير الحالة' : 'Update Status'}
+                                                             </p>
+                                                         </div>
+                                                         
+                                                         <div className="py-1.5">
+                                                             {statusOptions.map((opt, idx) => (
+                                                                 <div key={opt.value}>
+                                                                     {/* Divider before cancelled */}
+                                                                     {idx === statusOptions.length - 1 && (
+                                                                         <div className="mx-3 my-1 border-t border-gray-100 dark:border-[#2b2b3b]/40" />
+                                                                     )}
+                                                                     <button
+                                                                         onClick={() => {
+                                                                             handleUpdateOrderStatus(order.id, opt.value);
+                                                                             setActiveDropdownOrderId(null);
+                                                                         }}
+                                                                         className={`w-full text-start px-3.5 py-2 text-xs font-semibold transition-all duration-200 flex items-center gap-2.5 cursor-pointer group ${
+                                                                             order.status === opt.value
+                                                                                 ? `${opt.colorClass} ${opt.darkColorClass}`
+                                                                                 : "text-gray-600 hover:bg-gray-50 dark:text-gray-350 dark:hover:bg-[#232333]/50"
+                                                                         }`}
+                                                                     >
+                                                                         {/* Colored dot */}
+                                                                         <span className={`w-2 h-2 rounded-full shrink-0 ${opt.dotColor} ${
+                                                                             order.status === opt.value ? 'ring-2 ring-offset-1 ring-offset-white dark:ring-offset-[#1a1a24] ring-current scale-110' : 'opacity-50 group-hover:opacity-80'
+                                                                         } transition-all duration-200`} />
+                                                                         
+                                                                         {/* Icon + Label */}
+                                                                         <span className={`flex items-center gap-1.5 flex-1 ${
+                                                                             order.status === opt.value ? '' : 'opacity-70 group-hover:opacity-100'
+                                                                         } transition-opacity duration-200`}>
+                                                                             {opt.icon}
+                                                                             <span className="font-bold">{lang === 'ar' ? opt.labelAr : opt.labelEn}</span>
+                                                                         </span>
+                                                                         
+                                                                         {/* Active check */}
+                                                                         {order.status === opt.value && (
+                                                                             <CircleCheckBig className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                                                                         )}
+                                                                     </button>
+                                                                 </div>
+                                                             ))}
+                                                         </div>
                                                      </div>
                                                  </>
                                              )}
@@ -1104,6 +1436,150 @@ export default function AdminPage() {
                                                 )}
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </section>
+
+            {/* --- Coupon Code Management Section (Feature 4) --- */}
+            <section className="bg-white dark:bg-[#121216]/90 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-[#22222e] space-y-5 hover:shadow-md transition-shadow relative z-10">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2 border-b pb-2.5 border-gray-50 dark:border-[#22222e]/40">
+                    <Tag className="w-5 h-5 text-orange-500" />
+                    {t.adminCouponsHeader}
+                </h2>
+
+                {/* Add Coupon Form */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400">{t.adminCouponCode}</label>
+                        <input
+                            type="text"
+                            placeholder="e.g. SUMMER20"
+                            value={couponCode}
+                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                            className="w-full border border-gray-200 dark:border-[#22222e] p-2.5 rounded-xl text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 bg-gray-50/50 dark:bg-[#161622]/50 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-bold uppercase tracking-wider"
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400">{t.adminCouponType}</label>
+                        <select
+                            value={couponType}
+                            onChange={(e) => setCouponType(e.target.value as "percentage" | "fixed")}
+                            className="w-full border border-gray-200 dark:border-[#22222e] p-2.5 rounded-xl text-sm text-gray-900 dark:text-gray-100 bg-gray-50/50 dark:bg-[#161622]/50 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium"
+                        >
+                            <option value="percentage">{t.adminCouponPercentage}</option>
+                            <option value="fixed">{t.adminCouponFixed}</option>
+                        </select>
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400">{t.adminCouponValue}</label>
+                        <input
+                            type="number"
+                            placeholder={couponType === 'percentage' ? "e.g. 15" : "e.g. 5.00"}
+                            value={couponValue}
+                            onChange={(e) => setCouponValue(e.target.value)}
+                            className="w-full border border-gray-200 dark:border-[#22222e] p-2.5 rounded-xl text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 bg-gray-50/50 dark:bg-[#161622]/50 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium"
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400">{t.adminCouponExpiry}</label>
+                        <input
+                            type="date"
+                            value={couponExpiry}
+                            onChange={(e) => setCouponExpiry(e.target.value)}
+                            className="w-full border border-gray-200 dark:border-[#22222e] p-2.5 rounded-xl text-sm text-gray-900 dark:text-gray-100 bg-gray-50/50 dark:bg-[#161622]/50 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium"
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400">{t.adminCouponMinOrder}</label>
+                        <input
+                            type="number"
+                            placeholder="0.00"
+                            value={couponMinOrder}
+                            onChange={(e) => setCouponMinOrder(e.target.value)}
+                            className="w-full border border-gray-200 dark:border-[#22222e] p-2.5 rounded-xl text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 bg-gray-50/50 dark:bg-[#161622]/50 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium"
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400">{t.adminCouponMaxUses}</label>
+                        <input
+                            type="number"
+                            placeholder={lang === 'ar' ? "غير محدود" : "Unlimited"}
+                            value={couponMaxUses}
+                            onChange={(e) => setCouponMaxUses(e.target.value)}
+                            className="w-full border border-gray-200 dark:border-[#22222e] p-2.5 rounded-xl text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 bg-gray-50/50 dark:bg-[#161622]/50 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium"
+                        />
+                    </div>
+                </div>
+
+                <button
+                    onClick={handleAddCoupon}
+                    disabled={isAddingCoupon}
+                    className="w-full sm:w-auto bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-md shadow-orange-500/10 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 text-sm"
+                >
+                    {isAddingCoupon ? (
+                        <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            {t.adminCouponSaving}
+                        </>
+                    ) : (
+                        <>
+                            <Plus className="w-4 h-4" />
+                            {t.adminBtnAddCoupon}
+                        </>
+                    )}
+                </button>
+
+                {/* Coupons List */}
+                {coupons.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-6">
+                        {t.adminCouponNone}
+                    </p>
+                ) : (
+                    <div className="divide-y divide-gray-100 dark:divide-[#22222e]/30 max-h-80 overflow-y-auto">
+                        {coupons.map((coupon) => {
+                            const isExpired = coupon.expiry_date && new Date(coupon.expiry_date) < new Date();
+                            const isMaxed = coupon.max_uses && coupon.current_uses >= coupon.max_uses;
+
+                            return (
+                                <div key={coupon.id} className="flex flex-wrap items-center justify-between py-3.5 gap-3 text-start">
+                                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                                        <div className={`w-2 h-2 rounded-full shrink-0 ${coupon.is_active && !isExpired && !isMaxed ? 'bg-emerald-400' : 'bg-gray-300 dark:bg-gray-600'}`} />
+                                        <div className="min-w-0">
+                                            <span className="font-extrabold text-sm text-gray-900 dark:text-gray-100 tracking-wider block">{coupon.code}</span>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                                {coupon.discount_type === 'percentage' ? `${coupon.discount_value}%` : `$${coupon.discount_value.toFixed(2)}`}
+                                                {coupon.min_order_amount > 0 && ` · ${lang === 'ar' ? 'الحد الأدنى' : 'Min'} $${coupon.min_order_amount}`}
+                                                {' · '}{t.adminCouponUses}: {coupon.current_uses}/{coupon.max_uses || '∞'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {isExpired && (
+                                            <span className="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-950/20 px-2 py-0.5 rounded-full">{t.adminCouponExpired}</span>
+                                        )}
+                                        {isMaxed && !isExpired && (
+                                            <span className="text-[10px] font-bold text-amber-500 bg-amber-50 dark:bg-amber-950/20 px-2 py-0.5 rounded-full">Maxed</span>
+                                        )}
+                                        <button
+                                            onClick={() => handleToggleCoupon(coupon.id, coupon.is_active)}
+                                            className={`relative w-9 h-5 rounded-full transition-colors duration-300 cursor-pointer ${
+                                                coupon.is_active ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'
+                                            }`}
+                                        >
+                                            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-all duration-300 ${
+                                                coupon.is_active ? 'left-4.5' : 'left-0.5'
+                                            }`} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteCoupon(coupon.id)}
+                                            className="p-1.5 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-950/40 text-red-500 dark:text-red-400 rounded-lg transition-all cursor-pointer"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
                                     </div>
                                 </div>
                             );

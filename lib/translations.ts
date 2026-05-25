@@ -182,6 +182,48 @@ export const translations = {
     adminOrderStatus: "Fulfillment Status",
     adminOrderDate: "Date",
     adminOrderAction: "Change Stage",
+
+    // Feature 1: Real-Time Sync
+    liveSync: "Live Sync",
+    newOrderReceived: "New order received!",
+    realtimeConnected: "Real-time connected",
+
+    // Feature 2: Product Availability
+    adminToggleAvailable: "Available",
+    adminToggleUnavailable: "Out of Stock",
+
+    // Feature 3: Admin Analytics
+    adminAnalyticsTitle: "Business Analytics",
+    adminRevenue: "Today's Revenue",
+    adminActiveOrders: "Active Orders",
+    adminTotalSales: "Total Sales",
+    adminPopularItem: "Most Popular",
+    adminNoSalesYet: "No sales yet",
+
+    // Feature 4: Coupon System
+    adminCouponsHeader: "6. Coupon Code Management",
+    adminCouponCode: "Coupon Code",
+    adminCouponType: "Discount Type",
+    adminCouponValue: "Discount Value",
+    adminCouponExpiry: "Expiry Date",
+    adminCouponMinOrder: "Min Order ($)",
+    adminCouponMaxUses: "Max Uses",
+    adminCouponActive: "Active",
+    adminCouponInactive: "Inactive",
+    adminCouponUses: "Uses",
+    adminCouponPercentage: "Percentage (%)",
+    adminCouponFixed: "Fixed Amount ($)",
+    adminBtnAddCoupon: "Create Coupon",
+    adminCouponSaving: "Creating...",
+    adminCouponNone: "No coupons created yet.",
+    adminCouponExpired: "Expired",
+    adminCouponUnlimited: "Unlimited",
+    checkoutPromoInvalid: "Invalid or expired promo code.",
+    checkoutPromoMinOrder: "Minimum order of $%s required.",
+    checkoutPromoMaxedOut: "This promo code has reached its maximum usage.",
+
+    // Feature 5: Quick Reorder
+    ordersQuickReorder: "Quick Reorder",
   },
   ar: {
     // Navbar
@@ -363,6 +405,48 @@ export const translations = {
     adminOrderStatus: "حالة التلبية",
     adminOrderDate: "التاريخ",
     adminOrderAction: "تغيير المرحلة",
+
+    // Feature 1: Real-Time Sync
+    liveSync: "تحديث فوري",
+    newOrderReceived: "تم استلام طلب جديد!",
+    realtimeConnected: "متصل في الوقت الحقيقي",
+
+    // Feature 2: Product Availability
+    adminToggleAvailable: "متاح",
+    adminToggleUnavailable: "نفدت الكمية",
+
+    // Feature 3: Admin Analytics
+    adminAnalyticsTitle: "تحليلات الأعمال",
+    adminRevenue: "إيرادات اليوم",
+    adminActiveOrders: "الطلبات النشطة",
+    adminTotalSales: "إجمالي المبيعات",
+    adminPopularItem: "الأكثر طلباً",
+    adminNoSalesYet: "لا توجد مبيعات بعد",
+
+    // Feature 4: Coupon System
+    adminCouponsHeader: "٦. إدارة رموز الخصم",
+    adminCouponCode: "رمز الخصم",
+    adminCouponType: "نوع الخصم",
+    adminCouponValue: "قيمة الخصم",
+    adminCouponExpiry: "تاريخ الانتهاء",
+    adminCouponMinOrder: "الحد الأدنى للطلب ($)",
+    adminCouponMaxUses: "الحد الأقصى للاستخدام",
+    adminCouponActive: "نشط",
+    adminCouponInactive: "غير نشط",
+    adminCouponUses: "مرات الاستخدام",
+    adminCouponPercentage: "نسبة مئوية (%)",
+    adminCouponFixed: "مبلغ ثابت ($)",
+    adminBtnAddCoupon: "إنشاء كوبون",
+    adminCouponSaving: "جاري الإنشاء...",
+    adminCouponNone: "لم يتم إنشاء أي كوبونات بعد.",
+    adminCouponExpired: "منتهي الصلاحية",
+    adminCouponUnlimited: "غير محدود",
+    checkoutPromoInvalid: "رمز خصم غير صالح أو منتهي الصلاحية.",
+    checkoutPromoMinOrder: "الحد الأدنى للطلب $%s مطلوب.",
+    checkoutPromoMaxedOut: "وصل رمز الخصم هذا إلى الحد الأقصى للاستخدام.",
+
+    // Feature 5: Quick Reorder
+    ordersQuickReorder: "إعادة طلب سريع",
   }
 };
 

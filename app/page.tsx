@@ -21,6 +21,7 @@ interface Product {
   price: number;
   category_id: string;
   image_url: string;
+  is_available: boolean;
 }
 
 export default function Home() {
@@ -131,13 +132,23 @@ export default function Home() {
             {lang === 'ar' ? 'لم يتم العثور على أطباق في هذا القسم.' : 'No products found in this category.'}
           </p>
         ) : (
-          filteredProducts.map((product) => (
-            <div key={product.id} className="bg-white dark:bg-[#121216]/90 dark:border-[#22222e] rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+          filteredProducts.map((product) => {
+            const isUnavailable = product.is_available === false;
+            return (
+            <div key={product.id} className={`bg-white dark:bg-[#121216]/90 dark:border-[#22222e] rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow relative ${isUnavailable ? 'opacity-70' : ''}`}>
               {/* Product Image */}
               <div
-                className="h-48 w-full bg-cover bg-center"
+                className={`h-48 w-full bg-cover bg-center relative ${isUnavailable ? 'grayscale' : ''}`}
                 style={{ backgroundImage: `url(${product.image_url})` }}
-              />
+              >
+                {isUnavailable && (
+                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                    <span className="bg-red-500 text-white text-xs font-extrabold px-4 py-1.5 rounded-full uppercase tracking-wider shadow-lg">
+                      {t.btnOutOfStock}
+                    </span>
+                  </div>
+                )}
+              </div>
 
               {/* Product Details */}
               <div className="p-5 space-y-4">
@@ -145,13 +156,14 @@ export default function Home() {
                   <h3 className="font-bold text-lg text-gray-900 dark:text-gray-100 leading-tight">
                     {translateMenu(product.name, lang)}
                   </h3>
-                  <span className="font-bold text-green-600 dark:text-green-400 shrink-0">
+                  <span className={`font-bold shrink-0 ${isUnavailable ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-green-600 dark:text-green-400'}`}>
                     ${product.price.toFixed(2)}
                   </span>
                 </div>
 
                  <button
                   onClick={() => {
+                    if (isUnavailable) return;
                     if (!user) {
                       toast.error(
                         lang === 'ar'
@@ -167,13 +179,19 @@ export default function Home() {
 
                     setCustomizingProduct(product);
                   }}
-                  className="w-full bg-orange-100 text-orange-600 hover:bg-orange-500 hover:text-white dark:bg-orange-950/40 dark:text-orange-400 dark:hover:bg-orange-500 dark:hover:text-white font-semibold py-2.5 rounded-xl transition-colors cursor-pointer"
+                  disabled={isUnavailable}
+                  className={`w-full font-semibold py-2.5 rounded-xl transition-colors ${
+                    isUnavailable
+                      ? 'bg-gray-100 text-gray-400 dark:bg-[#1a1a24] dark:text-gray-500 cursor-not-allowed'
+                      : 'bg-orange-100 text-orange-600 hover:bg-orange-500 hover:text-white dark:bg-orange-950/40 dark:text-orange-400 dark:hover:bg-orange-500 dark:hover:text-white cursor-pointer'
+                  }`}
                 >
-                  {t.btnCustomize}
+                  {isUnavailable ? t.btnOutOfStock : t.btnCustomize}
                 </button>
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

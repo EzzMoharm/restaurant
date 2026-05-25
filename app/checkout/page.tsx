@@ -62,6 +62,7 @@ export default function CheckoutPage() {
     const [promoCode, setPromoCode] = useState("");
     const [discountAmount, setDiscountAmount] = useState(0);
     const [appliedPromo, setAppliedPromo] = useState("");
+    const [appliedCouponId, setAppliedCouponId] = useState<string | null>(null);
 
     // Hydration check
     const [isMounted, setIsMounted] = useState(false);
@@ -99,8 +100,8 @@ export default function CheckoutPage() {
         verifySession();
     }, [router, lang]);
 
-    // Apply Promo Code
-    function handleApplyPromo(e: React.FormEvent) {
+    // Apply Promo Code (Database-backed - Feature 4)
+    async function handleApplyPromo(e: React.FormEvent) {
         e.preventDefault();
         const code = promoCode.trim().toUpperCase();
         
@@ -108,22 +109,65 @@ export default function CheckoutPage() {
             return toast.error(lang === 'ar' ? "تم تطبيق كود الخصم بالفعل." : "A promo code has already been applied.");
         }
 
+        if (!code) return;
+
         const subtotal = cartTotal();
 
-        if (code === "WELCOME10") {
-            setDiscountAmount(subtotal * 0.10);
-            setAppliedPromo(lang === 'ar' ? "WELCOME10 (خصم 10%)" : "WELCOME10 (10% Off)");
-            toast.success(lang === 'ar' ? "تم تطبيق خصم 10%!" : "10% discount applied!");
-        } else if (code === "BITE5") {
-            setDiscountAmount(Math.min(5, subtotal));
-            setAppliedPromo(lang === 'ar' ? "BITE5 (خصم بقيمة $5.00)" : "BITE5 ($5.00 Off)");
-            toast.success(lang === 'ar' ? "تم تطبيق خصم بقيمة 5.00 دولار!" : "$5.00 discount applied!");
-        } else if (code === "FREE") {
-            setDiscountAmount(subtotal);
-            setAppliedPromo(lang === 'ar' ? "FREE (خصم 100%)" : "FREE (100% Off)");
-            toast.success(lang === 'ar' ? "تم تطبيق خصم 100%! استمتع بوجبتك المجانية." : "100% discount applied! Enjoy your free meal.");
-        } else {
-            toast.error(lang === 'ar' ? "كود خصم غير صالح. جرب WELCOME10 أو BITE5 أو FREE." : "Invalid promo code. Try WELCOME10, BITE5, or FREE.");
+        try {
+            const { data: coupon, error } = await supabase
+                .from("coupons")
+                .select("*")
+                .eq("code", code)
+                .eq("is_active", true)
+                .single();
+
+            if (error || !coupon) {
+                toast.error(lang === 'ar' ? "رمز خصم غير صالح أو منتهي الصلاحية." : "Invalid or expired promo code.");
+                setPromoCode("");
+                return;
+            }
+
+            // Check expiry
+            if (coupon.expiry_date && new Date(coupon.expiry_date) < new Date()) {
+                toast.error(lang === 'ar' ? "رمز خصم غير صالح أو منتهي الصلاحية." : "Invalid or expired promo code.");
+                setPromoCode("");
+                return;
+            }
+
+            // Check max uses
+            if (coupon.max_uses && coupon.current_uses >= coupon.max_uses) {
+                toast.error(lang === 'ar' ? "وصل رمز الخصم هذا إلى الحد الأقصى للاستخدام." : "This promo code has reached its maximum usage.");
+                setPromoCode("");
+                return;
+            }
+
+            // Check minimum order amount
+            if (coupon.min_order_amount && subtotal < coupon.min_order_amount) {
+                const msg = lang === 'ar'
+                    ? `الحد الأدنى للطلب $${coupon.min_order_amount.toFixed(2)} مطلوب.`
+                    : `Minimum order of $${coupon.min_order_amount.toFixed(2)} required.`;
+                toast.error(msg);
+                setPromoCode("");
+                return;
+            }
+
+            // Apply discount
+            if (coupon.discount_type === "percentage") {
+                const discount = subtotal * (coupon.discount_value / 100);
+                setDiscountAmount(discount);
+                setAppliedPromo(`${code} (${coupon.discount_value}% ${lang === 'ar' ? 'خصم' : 'Off'})`);
+            } else {
+                const discount = Math.min(coupon.discount_value, subtotal);
+                setDiscountAmount(discount);
+                setAppliedPromo(`${code} ($${coupon.discount_value.toFixed(2)} ${lang === 'ar' ? 'خصم' : 'Off'})`);
+            }
+
+            // Store coupon ID for incrementing uses on order placement
+            setAppliedCouponId(coupon.id);
+
+            toast.success(lang === 'ar' ? "تم تطبيق الخصم بنجاح!" : "Discount applied successfully!");
+        } catch {
+            toast.error(lang === 'ar' ? "حدث خطأ أثناء التحقق من الكود." : "An error occurred while verifying the code.");
         }
         setPromoCode("");
     }
@@ -236,7 +280,22 @@ export default function CheckoutPage() {
                 })
             );
 
-            // 4. Clear cart
+            // 4. Increment coupon usage if a coupon was applied
+            if (appliedCouponId) {
+                const { data: couponData } = await supabase
+                    .from('coupons')
+                    .select('current_uses')
+                    .eq('id', appliedCouponId)
+                    .single();
+                if (couponData) {
+                    await supabase
+                        .from('coupons')
+                        .update({ current_uses: (couponData.current_uses || 0) + 1 })
+                        .eq('id', appliedCouponId);
+                }
+            }
+
+            // 5. Clear cart
             clearCart();
 
             // 5. Display success toast matching BiteFlow system
