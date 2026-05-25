@@ -4,8 +4,49 @@ import { useEffect, useState } from "react";
 import { useCartStore, CartItem } from "@/store/cart";
 import { X, Minus, Plus, Check, ShoppingBag } from "lucide-react";
 import toast from "react-hot-toast";
+import { useTranslation, translateMenu } from "@/lib/translations";
+import { useSettingsStore } from "@/store/settings";
+
+const translateAddon = (addon: string, lang: string) => {
+    if (addon && lang === 'ar') {
+        const map: Record<string, string> = {
+            "Extra Cheese": "جبنة إضافية",
+            "Gluten-Free Base": "عجينة خالية من الغلوتين",
+            "Spicy Jalapeno": "هالبينو حار",
+            "Truffle Oil Drizzle": "زيت الترفل",
+            "Extra Patty": "شريحة لحم إضافية",
+            "Avocado Slices": "شرائح أفوكادو",
+            "Vanilla Ice Cream Scoop": "كرة آيس كريم فانيليا",
+            "Mint Sprig": "غصن نعناع",
+            "Whipped Cream": "كريمة مخفوقة",
+            "Chocolate Sauce": "صلصة الشوكولاتة",
+            "No Sugar": "بدون سكر",
+            "Less Ice": "ثلج قليل",
+            "Extra Shot": "جرعة إضافية",
+            "Regular": "عادي",
+            "Medium": "متوسط",
+            "Large": "كبير",
+            "Small": "صغير",
+            "Double Portion": "حصة مضاعفة",
+            "Extra Ice": "ثلج إضافي",
+            "Lemon Slice": "شريحة ليمون",
+            "Mint Leaves": "أوراق نعناع",
+            "Whipped Cream ": "كريمة مخفوقة ",
+            "Chocolate Syrup": "شراب شوكولاتة",
+            "Scoop of Vanilla Ice Cream": "كرة آيس كريم فانيليا",
+            "Bacon Strips": "شرائح قديد لحم البقر",
+            "Jalapeños": "هالبينو",
+            "Sautéed Mushrooms": "فطر سوتيه"
+        };
+        return map[addon] || addon;
+    }
+    return addon;
+};
 
 export default function CustomizationModal() {
+  const { lang } = useTranslation();
+  const theme = useSettingsStore((state) => state.theme);
+
   const {
     customizingProduct,
     editingItem,
@@ -161,16 +202,27 @@ export default function CustomizationModal() {
       }
     };
 
+    const isDark = theme === "dark";
+    const toastStyle = isDark 
+      ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+      : { border: editingItem ? '1px solid #F59E0B' : '1px solid #10B981', padding: '16px', color: editingItem ? '#B45309' : '#047857', fontWeight: 'bold' };
+
     if (editingItem) {
       updateItem(editingItem.id, newItem);
-      toast.success(`${baseName} customization updated!`, {
-        style: { border: '1px solid #F59E0B', padding: '16px', color: '#B45309', fontWeight: 'bold' }
-      });
+      toast.success(
+        lang === 'ar'
+          ? `تم تحديث تخصيص ${translateMenu(baseName, lang)}!`
+          : `${baseName} customization updated!`,
+        { style: toastStyle }
+      );
     } else {
       addItem(newItem);
-      toast.success(`${baseName} added to cart!`, {
-        style: { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
-      });
+      toast.success(
+        lang === 'ar'
+          ? `تم إضافة ${translateMenu(baseName, lang)} إلى السلة!`
+          : `${baseName} added to cart!`,
+        { style: toastStyle }
+      );
     }
 
     // Reset store triggers
@@ -185,48 +237,59 @@ export default function CustomizationModal() {
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[100] p-4 animate-fadeIn">
-      <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-gray-100 shadow-2xl relative flex flex-col p-6 space-y-6 animate-scaleUp">
+      <div className="bg-white dark:bg-[#121216] rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-gray-100 dark:border-[#22222e] shadow-2xl relative flex flex-col p-6 space-y-6 animate-scaleUp">
         {/* Close Button */}
         <button 
           onClick={handleCloseModal} 
-          className="absolute top-5 right-5 p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all cursor-pointer"
+          className="absolute top-5 right-5 p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-[#1a1a24] rounded-full transition-all cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Product Meta Header */}
-        <div className="flex items-start gap-4 pr-8">
+        <div className="flex items-start gap-4 pr-8 text-left">
           {imageUrl && (
             <div 
-              className="w-20 h-20 bg-cover bg-center rounded-2xl border border-gray-100 shrink-0"
+              className="w-20 h-20 bg-cover bg-center rounded-2xl border border-gray-100 dark:border-[#22222e]/60 shrink-0"
               style={{ backgroundImage: `url(${imageUrl})` }}
             />
           )}
           <div className="space-y-1 text-left">
             <span className="text-xs font-bold text-orange-500 uppercase tracking-widest">
-              {editingItem ? "Edit Customization" : "Customize Dish"}
+              {editingItem 
+                ? (lang === 'ar' ? "تعديل التخصيص" : "Edit Customization")
+                : (lang === 'ar' ? "تخصيص الطبق" : "Customize Dish")
+              }
             </span>
-            <h3 className="text-xl font-extrabold text-gray-900 leading-tight">{baseName}</h3>
-            <p className="font-extrabold text-sm text-green-600">${basePrice.toFixed(2)}</p>
+            <h3 className="text-xl font-extrabold text-gray-900 dark:text-gray-100 leading-tight">
+              {translateMenu(baseName, lang)}
+            </h3>
+            <p className="font-extrabold text-sm text-green-600 dark:text-green-400">${basePrice.toFixed(2)}</p>
           </div>
         </div>
 
         {/* Portion Size selection */}
         {sizeOptions.length > 0 && (
           <div className="space-y-3 text-left">
-            <h4 className="text-xs font-extrabold text-gray-400 uppercase tracking-widest pl-0.5">Select Portion Size</h4>
+            <h4 className="text-xs font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-widest pl-0.5">
+              {lang === 'ar' ? "اختر حجم الحصة" : "Select Portion Size"}
+            </h4>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {sizeOptions.map((opt) => {
                 const isSelected = selectedSize === opt.name;
-                const priceLabel = opt.price === 0 ? "Included" : opt.price > 0 ? `+$${opt.price.toFixed(2)}` : `-$${Math.abs(opt.price).toFixed(2)}`;
+                const priceLabel = opt.price === 0 
+                  ? (lang === 'ar' ? "مشمول" : "Included") 
+                  : opt.price > 0 
+                    ? `+$${opt.price.toFixed(2)}` 
+                    : `-$${Math.abs(opt.price).toFixed(2)}`;
                 
                 return (
                   <label 
                     key={opt.name}
                     className={`border p-3 rounded-2xl flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
                       isSelected 
-                        ? 'border-orange-500 bg-orange-50/20 font-bold' 
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-orange-500 bg-orange-50/20 dark:bg-orange-950/20 font-bold' 
+                        : 'border-gray-200 dark:border-[#22222e] hover:border-gray-300 dark:hover:border-gray-800'
                     }`}
                   >
                     <input 
@@ -237,8 +300,8 @@ export default function CustomizationModal() {
                       onChange={() => setSelectedSize(opt.name)}
                       className="sr-only" 
                     />
-                    <span className="text-sm text-gray-900">{opt.name}</span>
-                    <span className="text-[10px] text-gray-400 mt-0.5 font-medium">{priceLabel}</span>
+                    <span className="text-sm text-gray-900 dark:text-gray-100">{translateAddon(opt.name, lang)}</span>
+                    <span className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 font-medium">{priceLabel}</span>
                   </label>
                 );
               })}
@@ -249,7 +312,9 @@ export default function CustomizationModal() {
         {/* Toppings / Add-ons selections */}
         {addonOptions.length > 0 && (
           <div className="space-y-3 text-left">
-            <h4 className="text-xs font-extrabold text-gray-400 uppercase tracking-widest pl-0.5">Choose Toppings / Add-ons</h4>
+            <h4 className="text-xs font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-widest pl-0.5">
+              {lang === 'ar' ? "اختر الإضافات" : "Choose Toppings / Add-ons"}
+            </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {addonOptions.map((addon) => {
                 const isChecked = selectedAddons.includes(addon.name);
@@ -267,20 +332,20 @@ export default function CustomizationModal() {
                     onClick={handleToggleAddon}
                     className={`border p-3.5 rounded-2xl flex items-center justify-between cursor-pointer transition-all ${
                       isChecked 
-                        ? 'border-orange-500 bg-orange-50/10 font-semibold' 
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-orange-500 bg-orange-50/10 dark:bg-orange-950/15 font-semibold' 
+                        : 'border-gray-200 dark:border-[#22222e] hover:border-gray-300 dark:hover:border-gray-800'
                     }`}
                   >
                     <div className="flex items-center gap-2">
                       <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all ${
-                        isChecked ? 'bg-orange-500 border-orange-500 text-white' : 'border-gray-300'
+                        isChecked ? 'bg-orange-500 border-orange-500 text-white' : 'border-gray-300 dark:border-[#22222e]'
                       }`}>
                         {isChecked && <Check className="w-3 h-3 stroke-[3px]" />}
                       </div>
-                      <span className="text-xs text-gray-800">{addon.name}</span>
+                      <span className="text-xs text-gray-800 dark:text-gray-200">{translateAddon(addon.name, lang)}</span>
                     </div>
-                    <span className="text-[10px] font-bold text-gray-400">
-                      {addon.price === 0 ? "Free" : `+$${addon.price.toFixed(2)}`}
+                    <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500">
+                      {addon.price === 0 ? (lang === 'ar' ? "مجاني" : "Free") : `+$${addon.price.toFixed(2)}`}
                     </span>
                   </label>
                 );
@@ -291,30 +356,36 @@ export default function CustomizationModal() {
 
         {/* Special Instructions */}
         <div className="space-y-2 text-left">
-          <h4 className="text-xs font-extrabold text-gray-400 uppercase tracking-widest pl-0.5">Special Preparation Notes</h4>
+          <h4 className="text-xs font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-widest pl-0.5">
+            {lang === 'ar' ? "ملاحظات تحضير خاصة" : "Special Preparation Notes"}
+          </h4>
           <textarea
-            placeholder="e.g. No onions, extra hot, sauce on the side..."
+            placeholder={
+              lang === 'ar'
+                ? "مثال: بدون بصل، حار إضافي، الصلصة جانباً..."
+                : "e.g. No onions, extra hot, sauce on the side..."
+            }
             value={specialInstructions}
             onChange={(e) => setSpecialInstructions(e.target.value)}
             maxLength={100}
-            className="w-full border border-gray-200 p-3 rounded-2xl text-xs text-gray-900 placeholder-gray-400 bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium min-h-[70px] resize-none"
+            className="w-full border border-gray-200 dark:border-[#22222e] p-3 rounded-2xl text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-550 bg-gray-50/50 dark:bg-[#161622]/50 focus:bg-white dark:focus:bg-[#121216] focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium min-h-[70px] resize-none"
           />
         </div>
 
         {/* Bottom actions Panel */}
-        <div className="border-t border-gray-50 pt-4 flex items-center justify-between gap-4">
+        <div className="border-t border-gray-50 dark:border-[#22222e]/40 pt-4 flex items-center justify-between gap-4">
           {/* Quantity Counter */}
-          <div className="flex items-center border border-gray-200 rounded-2xl p-1 bg-gray-50/50">
+          <div className="flex items-center border border-gray-200 dark:border-[#22222e] rounded-2xl p-1 bg-gray-50/50 dark:bg-[#161622]/50">
             <button 
               onClick={() => setCustomQuantity(prev => Math.max(1, prev - 1))}
-              className="p-2 hover:bg-white rounded-xl text-gray-600 transition-colors cursor-pointer shrink-0"
+              className="p-2 hover:bg-white dark:hover:bg-[#121216] rounded-xl text-gray-600 dark:text-gray-400 transition-colors cursor-pointer shrink-0"
             >
               <Minus className="w-4 h-4" />
             </button>
-            <span className="w-10 text-center text-sm font-extrabold text-gray-900">{customQuantity}</span>
+            <span className="w-10 text-center text-sm font-extrabold text-gray-900 dark:text-gray-100">{customQuantity}</span>
             <button 
               onClick={() => setCustomQuantity(prev => prev + 1)}
-              className="p-2 hover:bg-white rounded-xl text-gray-600 transition-colors cursor-pointer shrink-0"
+              className="p-2 hover:bg-white dark:hover:bg-[#121216] rounded-xl text-gray-600 dark:text-gray-400 transition-colors cursor-pointer shrink-0"
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -326,7 +397,10 @@ export default function CustomizationModal() {
             className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold py-3.5 px-6 rounded-2xl transition-all shadow-md shadow-orange-500/10 flex items-center justify-center gap-2 cursor-pointer text-xs sm:text-sm uppercase tracking-wider"
           >
             <ShoppingBag className="w-4 h-4" />
-            {editingItem ? "Update Order" : "Add to Cart"} - ${calculateCustomizedPrice().toFixed(2)}
+            {editingItem 
+              ? (lang === 'ar' ? "تحديث الطلب" : "Update Order")
+              : (lang === 'ar' ? "إضافة للسلة" : "Add to Cart")
+            } - ${calculateCustomizedPrice().toFixed(2)}
           </button>
         </div>
       </div>

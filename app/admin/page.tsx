@@ -6,7 +6,10 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { isUserAdmin } from "@/lib/supabase/admin";
 import { User } from "@supabase/supabase-js";
-import { ShieldX, LogOut, ArrowLeft, PlusCircle, LayoutDashboard, Layers, ShoppingBag, AlertCircle, Trash2, Truck, Calendar, RefreshCw } from "lucide-react";
+import { ShieldX, LogOut, ArrowLeft, PlusCircle, LayoutDashboard, Layers, ShoppingBag, AlertCircle, Trash2, Truck, Calendar, RefreshCw, ChevronDown } from "lucide-react";
+import toast from "react-hot-toast";
+import { useTranslation, translateMenu } from "@/lib/translations";
+import { useSettingsStore } from "@/store/settings";
 
 interface Category {
     id: string;
@@ -66,10 +69,100 @@ interface OrderDeliveryMeta {
     paymentMethod: string;
     items?: MetaItem[];
 }
-import toast from "react-hot-toast";
+
+const translateAddon = (addon: string, lang: string) => {
+    if (addon && lang === 'ar') {
+        const map: Record<string, string> = {
+            "Extra Cheese": "جبنة إضافية",
+            "Gluten-Free Base": "عجينة خالية من الغلوتين",
+            "Spicy Jalapeno": "هالبينو حار",
+            "Truffle Oil Drizzle": "زيت الترفل",
+            "Extra Patty": "شريحة لحم إضافية",
+            "Avocado Slices": "شرائح أفوكادو",
+            "Vanilla Ice Cream Scoop": "كرة آيس كريم فانيليا",
+            "Mint Sprig": "غصن نعناع",
+            "Whipped Cream": "كريمة مخفوقة",
+            "Chocolate Sauce": "صلصة الشوكولاتة",
+            "No Sugar": "بدون سكر",
+            "Less Ice": "ثلج قليل",
+            "Extra Shot": "جرعة إضافية",
+            "Regular": "عادي",
+            "Medium": "متوسط",
+            "Large": "كبير",
+            "Small": "صغير",
+            "Double Portion": "حصة مضاعفة",
+            "Extra Ice": "ثلج إضافي",
+            "Lemon Slice": "شريحة ليمون",
+            "Mint Leaves": "أوراق نعناع",
+            "Whipped Cream ": "كريمة مخفوقة ",
+            "Chocolate Syrup": "شراب شوكولاتة",
+            "Scoop of Vanilla Ice Cream": "كرة آيس كريم فانيليا",
+            "Bacon Strips": "شرائح قديد لحم البقر",
+            "Jalapeños": "هالبينو",
+            "Sautéed Mushrooms": "فطر سوتيه"
+        };
+        return map[addon] || addon;
+    }
+    return addon;
+};
+
+interface StatusOption {
+    value: string;
+    labelEn: string;
+    labelAr: string;
+    colorClass: string;
+    darkColorClass: string;
+}
+
+const statusOptions: StatusOption[] = [
+    {
+        value: "pending",
+        labelEn: "Pending",
+        labelAr: "قيد الانتظار",
+        colorClass: "bg-orange-50 text-orange-700 border-orange-250 hover:bg-orange-100",
+        darkColorClass: "dark:bg-orange-950/20 dark:text-orange-400 dark:border-orange-900/35 dark:hover:bg-orange-950/30"
+    },
+    {
+        value: "preparing",
+        labelEn: "Preparing",
+        labelAr: "قيد التحضير",
+        colorClass: "bg-blue-50 text-blue-700 border-blue-250 hover:bg-blue-100",
+        darkColorClass: "dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900/35 dark:hover:bg-blue-950/30"
+    },
+    {
+        value: "ready",
+        labelEn: "Ready",
+        labelAr: "جاهز للاستلام",
+        colorClass: "bg-purple-50 text-purple-700 border-purple-250 hover:bg-purple-100",
+        darkColorClass: "dark:bg-purple-950/20 dark:text-purple-400 dark:border-purple-900/35 dark:hover:bg-purple-950/30"
+    },
+    {
+        value: "delivering",
+        labelEn: "Delivering",
+        labelAr: "جاري التوصيل",
+        colorClass: "bg-indigo-50 text-indigo-700 border-indigo-250 hover:bg-indigo-100",
+        darkColorClass: "dark:bg-indigo-950/20 dark:text-indigo-400 dark:border-indigo-900/35 dark:hover:bg-indigo-950/30"
+    },
+    {
+        value: "delivered",
+        labelEn: "Delivered",
+        labelAr: "تم التوصيل",
+        colorClass: "bg-emerald-50 text-emerald-700 border-emerald-250 hover:bg-emerald-100",
+        darkColorClass: "dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/35 dark:hover:bg-emerald-950/30"
+    },
+    {
+        value: "cancelled",
+        labelEn: "Cancelled",
+        labelAr: "تم الإلغاء",
+        colorClass: "bg-rose-50 text-rose-700 border-rose-250 hover:bg-rose-100",
+        darkColorClass: "dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/35 dark:hover:bg-rose-950/30"
+    }
+];
 
 export default function AdminPage() {
     const router = useRouter();
+    const { t, lang } = useTranslation();
+
     const [user, setUser] = useState<User | null>(null);
     const [authLoading, setAuthLoading] = useState(true);
     const [isAdminState, setIsAdminState] = useState(false);
@@ -92,6 +185,7 @@ export default function AdminPage() {
 
     const [orders, setOrders] = useState<AdminOrder[]>([]);
     const [isLoadingOrders, setIsLoadingOrders] = useState<boolean>(false);
+    const [activeDropdownOrderId, setActiveDropdownOrderId] = useState<string | null>(null);
 
     // Run authentication and session check immediately
     useEffect(() => {
@@ -99,7 +193,6 @@ export default function AdminPage() {
             try {
                 const { data: { user }, error } = await supabase.auth.getUser();
                 if (error || !user) {
-                    // No session exists, redirect straight to admin login
                     router.push("/admin/login");
                     return;
                 }
@@ -109,7 +202,6 @@ export default function AdminPage() {
                 setIsAdminState(adminCheck);
 
                 if (adminCheck) {
-                    // If authorized admin, fetch dashboard categories and products
                     await fetchCategories();
                     await fetchProducts();
                     await fetchAllOrders();
@@ -123,7 +215,6 @@ export default function AdminPage() {
         }
         checkSession();
 
-        // Subscribe to auth state updates to react instantly if they log out
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (event === "SIGNED_OUT" || !session) {
                 setUser(null);
@@ -135,15 +226,22 @@ export default function AdminPage() {
         return () => {
             subscription.unsubscribe();
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [router]);
 
     async function fetchCategories() {
+        const isDark = useSettingsStore.getState().theme === "dark";
         const { data, error } = await supabase.from("categories").select("*");
 
         if (error) {
-            toast.error("Database Error: " + error.message, {
-                style: { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
-            });
+            toast.error(
+                (lang === 'ar' ? "خطأ في قاعدة البيانات: " : "Database Error: ") + error.message,
+                {
+                    style: isDark
+                        ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                        : { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
+                }
+            );
             return;
         }
 
@@ -154,14 +252,20 @@ export default function AdminPage() {
     }
 
     async function fetchProducts() {
+        const isDark = useSettingsStore.getState().theme === "dark";
         const { data, error } = await supabase
             .from("products")
             .select("*, categories(name)");
 
         if (error) {
-            toast.error("Database Error: " + error.message, {
-                style: { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
-            });
+            toast.error(
+                (lang === 'ar' ? "خطأ في قاعدة البيانات: " : "Database Error: ") + error.message,
+                {
+                    style: isDark
+                        ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                        : { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
+                }
+            );
             return;
         }
 
@@ -194,13 +298,13 @@ export default function AdminPage() {
                 .order("created_at", { ascending: false });
 
             if (error) {
-                toast.error("Error loading orders: " + error.message);
+                toast.error((lang === 'ar' ? "خطأ في تحميل الطلبات: " : "Error loading orders: ") + error.message);
             } else if (data) {
                 setOrders((data as unknown as AdminOrder[]) || []);
             }
         } catch (err) {
             console.error("Fetch all orders error:", err);
-            const errMsg = err instanceof Error ? err.message : "Error loading orders";
+            const errMsg = err instanceof Error ? err.message : (lang === 'ar' ? "خطأ في تحميل الطلبات" : "Error loading orders");
             toast.error(errMsg);
         } finally {
             setIsLoadingOrders(false);
@@ -208,6 +312,7 @@ export default function AdminPage() {
     }
 
     async function handleUpdateOrderStatus(orderId: string, newStatus: string) {
+        const isDark = useSettingsStore.getState().theme === "dark";
         try {
             const { error } = await supabase
                 .from("orders")
@@ -215,22 +320,34 @@ export default function AdminPage() {
                 .eq("id", orderId);
 
             if (error) {
-                toast.error("Fulfillment Error: " + error.message);
+                toast.error((lang === 'ar' ? "خطأ في التلبية: " : "Fulfillment Error: ") + error.message);
             } else {
-                toast.success(`Fulfillment updated to: ${newStatus.toUpperCase()}`, {
-                    style: { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
-                });
+                toast.success(
+                    lang === 'ar' 
+                        ? `تم تحديث التلبية إلى: ${getStatusLabel(newStatus)}`
+                        : `Fulfillment updated to: ${newStatus.toUpperCase()}`,
+                    {
+                        style: isDark
+                            ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                            : { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
+                    }
+                );
                 fetchAllOrders();
             }
         } catch (err) {
             console.error("Update status error:", err);
-            const errMsg = err instanceof Error ? err.message : "Fulfillment error";
+            const errMsg = err instanceof Error ? err.message : (lang === 'ar' ? "خطأ في التلبية" : "Fulfillment error");
             toast.error(errMsg);
         }
     }
 
     async function handleDeleteProduct(id: string) {
-        if (!confirm("Are you sure you want to delete this product?")) return;
+        const isDark = useSettingsStore.getState().theme === "dark";
+        const confirmMsg = lang === 'ar'
+            ? "هل أنت متأكد أنك تريد حذف هذه الوجبة؟"
+            : "Are you sure you want to delete this product?";
+        
+        if (!confirm(confirmMsg)) return;
 
         setIsDeletingProduct(id);
 
@@ -242,24 +359,40 @@ export default function AdminPage() {
         setIsDeletingProduct(null);
 
         if (error) {
-            toast.error("Error deleting product: " + error.message, {
-                style: { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C' }
-            });
+            toast.error(
+                (lang === 'ar' ? "خطأ في حذف الوجبة: " : "Error deleting product: ") + error.message,
+                {
+                    style: isDark
+                        ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                        : { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
+                }
+            );
         } else {
             fetchProducts();
-            toast.success("Product deleted successfully!", {
-                style: { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
-            });
+            toast.success(
+                lang === 'ar' ? "تم حذف الوجبة بنجاح!" : "Product deleted successfully!",
+                {
+                    style: isDark
+                        ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                        : { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
+                }
+            );
         }
     }
 
     async function handleAddCategory() {
+        const isDark = useSettingsStore.getState().theme === "dark";
         setCategoryErrors({});
         if (!categoryName.trim()) {
-            setCategoryErrors({ categoryName: "Please enter a category name." });
-            toast.error("Please fill out all category fields.", {
-                style: { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
-            });
+            setCategoryErrors({ categoryName: lang === 'ar' ? "يرجى إدخال اسم القسم." : "Please enter a category name." });
+            toast.error(
+                lang === 'ar' ? "يرجى ملء حقول الأقسام المطلوبة." : "Please fill out all category fields.",
+                {
+                    style: isDark
+                        ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                        : { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
+                }
+            );
             return;
         }
 
@@ -273,42 +406,58 @@ export default function AdminPage() {
         setIsAddingCategory(false);
 
         if (error) {
-            toast.error("Error adding category: " + error.message, {
-                style: { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C' }
-            });
+            toast.error(
+                (lang === 'ar' ? "خطأ في إضافة القسم: " : "Error adding category: ") + error.message,
+                {
+                    style: isDark
+                        ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                        : { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
+                }
+            );
         } else {
             setCategoryName("");
             fetchCategories(); // Instantly refresh the dropdown
-            toast.success("Category added successfully!", {
-                style: { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
-            });
+            toast.success(
+                lang === 'ar' ? "تم إضافة القسم بنجاح!" : "Category added successfully!",
+                {
+                    style: isDark
+                        ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                        : { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
+                }
+            );
         }
     }
 
     async function handleAddProduct() {
+        const isDark = useSettingsStore.getState().theme === "dark";
         setProductErrors({});
         const newErrors: Record<string, string> = {};
 
         if (!productName.trim()) {
-            newErrors.productName = "Please enter a product name.";
+            newErrors.productName = lang === 'ar' ? "يرجى إدخال اسم الوجبة." : "Please enter a product name.";
         }
         if (!price.trim()) {
-            newErrors.price = "Please enter a price.";
+            newErrors.price = lang === 'ar' ? "يرجى إدخال السعر." : "Please enter a price.";
         } else if (isNaN(parseFloat(price)) || parseFloat(price) <= 0) {
-            newErrors.price = "Please enter a valid price greater than 0.";
+            newErrors.price = lang === 'ar' ? "يرجى إدخال سعر صالح أكبر من 0." : "Please enter a valid price greater than 0.";
         }
         if (imageUrl.trim() && !/^https?:\/\/.+/.test(imageUrl.trim())) {
-            newErrors.imageUrl = "Please enter a valid image URL (e.g. http:// or https://).";
+            newErrors.imageUrl = lang === 'ar' ? "يرجى إدخال رابط صورة صالح." : "Please enter a valid image URL (e.g. http:// or https://).";
         }
         if (!selectedCategory) {
-            newErrors.selectedCategory = "Please select a category.";
+            newErrors.selectedCategory = lang === 'ar' ? "يرجى اختيار القسم المناسب." : "Please select a category.";
         }
 
         if (Object.keys(newErrors).length > 0) {
             setProductErrors(newErrors);
-            toast.error("Please fill in all product fields correctly.", {
-                style: { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
-            });
+            toast.error(
+                lang === 'ar' ? "يرجى ملء جميع حقول الوجبات بشكل صحيح." : "Please fill in all product fields correctly.",
+                {
+                    style: isDark
+                        ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                        : { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
+                }
+            );
             return;
         }
 
@@ -328,26 +477,54 @@ export default function AdminPage() {
         setIsAddingProduct(false);
 
         if (error) {
-            toast.error("Error adding product: " + error.message, {
-                style: { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C' }
-            });
+            toast.error(
+                (lang === 'ar' ? "خطأ في إضافة الوجبة: " : "Error adding product: ") + error.message,
+                {
+                    style: isDark
+                        ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                        : { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
+                }
+            );
         } else {
             setProductName("");
             setPrice("");
             setImageUrl("");
             fetchProducts();
-            toast.success("Product added successfully!", {
-                style: { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
-            });
+            toast.success(
+                lang === 'ar' ? "تم إضافة الوجبة بنجاح!" : "Product added successfully!",
+                {
+                    style: isDark
+                        ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                        : { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
+                }
+            );
         }
     }
 
     async function handleSignOut() {
+        const isDark = useSettingsStore.getState().theme === "dark";
         await supabase.auth.signOut();
-        toast.success("Logged out successfully.", {
-            style: { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
-        });
+        toast.success(
+            lang === 'ar' ? "تم تسجيل الخروج بنجاح." : "Logged out successfully.",
+            {
+                style: isDark
+                    ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                    : { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
+            }
+        );
         router.push("/");
+    }
+
+    function getStatusLabel(status: string) {
+        switch (status) {
+            case "pending": return lang === 'ar' ? "طلب قيد الانتظار" : "Pending Order";
+            case "preparing": return lang === 'ar' ? "قيد التحضير" : "Preparing";
+            case "ready": return lang === 'ar' ? "جاهز للاستلام" : "Ready";
+            case "delivering": return lang === 'ar' ? "جاري التوصيل" : "Delivering";
+            case "delivered": return lang === 'ar' ? "تم التوصيل" : "Delivered";
+            case "cancelled": return lang === 'ar' ? "تم الإلغاء" : "Cancelled";
+            default: return status;
+        }
     }
 
     // 1. Premium Loading State (Skeleton Loaders and Spinner)
@@ -355,26 +532,26 @@ export default function AdminPage() {
         return (
             <div className="max-w-4xl mx-auto space-y-8 py-10 px-4">
                 {/* Header Skeleton */}
-                <div className="flex justify-between items-center border-b pb-4 animate-pulse">
-                    <div className="h-9 w-48 bg-gray-200 rounded-lg"></div>
-                    <div className="h-10 w-24 bg-gray-200 rounded-lg"></div>
+                <div className="flex justify-between items-center border-b border-gray-150 dark:border-[#22222e] pb-4 animate-pulse">
+                    <div className="h-9 w-48 bg-gray-250 dark:bg-[#1a1a24] rounded-lg"></div>
+                    <div className="h-10 w-24 bg-gray-250 dark:bg-[#1a1a24] rounded-lg"></div>
                 </div>
                 {/* Form Card 1 Skeleton */}
-                <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100 space-y-4 animate-pulse">
-                    <div className="h-6 w-32 bg-gray-200 rounded"></div>
+                <div className="bg-white dark:bg-[#121216] p-6 rounded-xl shadow-md border border-gray-100 dark:border-[#22222e] space-y-4 animate-pulse">
+                    <div className="h-6 w-32 bg-gray-250 dark:bg-[#1a1a24] rounded"></div>
                     <div className="flex gap-4">
-                        <div className="h-12 bg-gray-200 rounded-lg flex-1"></div>
-                        <div className="h-12 w-32 bg-gray-200 rounded-lg"></div>
+                        <div className="h-12 bg-gray-250 dark:bg-[#1a1a24] rounded-lg flex-1"></div>
+                        <div className="h-12 w-32 bg-gray-250 dark:bg-[#1a1a24] rounded-lg"></div>
                     </div>
                 </div>
                 {/* Form Card 2 Skeleton */}
-                <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100 space-y-4 animate-pulse">
-                    <div className="h-6 w-40 bg-gray-200 rounded"></div>
+                <div className="bg-white dark:bg-[#121216] p-6 rounded-xl shadow-md border border-gray-100 dark:border-[#22222e] space-y-4 animate-pulse">
+                    <div className="h-6 w-40 bg-gray-250 dark:bg-[#1a1a24] rounded"></div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="h-12 bg-gray-200 rounded-lg"></div>
-                        <div className="h-12 bg-gray-200 rounded-lg"></div>
-                        <div className="h-12 bg-gray-200 rounded-lg"></div>
-                        <div className="h-12 bg-gray-200 rounded-lg"></div>
+                        <div className="h-12 bg-gray-250 dark:bg-[#1a1a24] rounded-lg"></div>
+                        <div className="h-12 bg-gray-250 dark:bg-[#1a1a24] rounded-lg"></div>
+                        <div className="h-12 bg-gray-250 dark:bg-[#1a1a24] rounded-lg"></div>
+                        <div className="h-12 bg-gray-250 dark:bg-[#1a1a24] rounded-lg"></div>
                     </div>
                 </div>
             </div>
@@ -384,35 +561,41 @@ export default function AdminPage() {
     // 2. Premium "Access Denied" Screen for Non-Admin Logged In Users
     if (user && !isAdminState) {
         return (
-            <div className="min-h-[80vh] flex items-center justify-center px-4 bg-gradient-to-br from-red-50 via-white to-gray-50 relative overflow-hidden">
-                <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-red-100/60 rounded-full blur-3xl pointer-events-none"></div>
+            <div className="min-h-[80vh] flex items-center justify-center px-4 bg-gradient-to-br from-red-50 via-white to-gray-50 dark:from-[#09090b] dark:via-[#121216] dark:to-[#0f0f13] relative overflow-hidden">
+                <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-red-100/60 dark:bg-red-950/15 rounded-full blur-3xl pointer-events-none"></div>
                 
-                <div className="max-w-md w-full text-center space-y-6 relative z-10 bg-white/90 backdrop-blur-md p-8 rounded-3xl shadow-xl border border-red-100">
-                    <div className="inline-flex p-4 bg-red-100 text-red-600 rounded-full animate-bounce">
+                <div className="max-w-md w-full text-center space-y-6 relative z-10 bg-white/90 dark:bg-[#121216] backdrop-blur-md p-8 rounded-3xl shadow-xl border border-red-100 dark:border-red-950/40">
+                    <div className="inline-flex p-4 bg-red-100 dark:bg-red-950/30 text-red-600 dark:text-red-400 rounded-full animate-bounce">
                         <ShieldX className="w-12 h-12" />
                     </div>
                     
                     <div className="space-y-2">
-                        <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Access Restricted</h1>
-                        <p className="text-gray-500 font-medium text-sm leading-relaxed">
-                            Oops! The account <span className="font-semibold text-gray-700">{user.email}</span> does not have system administrator permissions.
+                        <h1 className="text-2xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">
+                            {t.adminAccessDenied}
+                        </h1>
+                        <p className="text-gray-500 dark:text-gray-400 font-medium text-sm leading-relaxed">
+                            {lang === 'ar' ? (
+                                <>عذراً! الحساب <span className="font-semibold text-gray-700 dark:text-gray-300">{user.email}</span> لا يمتلك صلاحيات مسؤول النظام.</>
+                            ) : (
+                                <>Oops! The account <span className="font-semibold text-gray-700 dark:text-gray-300">{user.email}</span> does not have system administrator permissions.</>
+                            )}
                         </p>
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3 pt-2">
                         <button
                             onClick={() => router.push("/")}
-                            className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer text-sm"
+                            className="flex-1 bg-gray-100 dark:bg-[#1a1a24] hover:bg-gray-200 dark:hover:bg-[#232333] text-gray-800 dark:text-gray-300 border border-gray-200/50 dark:border-[#22222e] font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer text-sm"
                         >
-                            <ArrowLeft className="w-4 h-4" />
-                            Back to Home
+                            <ArrowLeft className={`w-4 h-4 ${lang === 'ar' ? 'rotate-180' : ''}`} />
+                            {t.adminBtnBackHome}
                         </button>
                         <button
                             onClick={handleSignOut}
                             className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md shadow-red-600/10 flex items-center justify-center gap-2 cursor-pointer text-sm"
                         >
                             <LogOut className="w-4 h-4" />
-                            Sign Out
+                            {t.adminBtnSignOut}
                         </button>
                     </div>
                 </div>
@@ -420,48 +603,51 @@ export default function AdminPage() {
         );
     }
 
-    // Filter products for administrative management list
     const filteredManageProducts = manageActiveCategory === "all"
         ? products
         : products.filter((p) => p.category_id === manageActiveCategory);
 
     // 3. Render the Protected Dashboard if Authorized Admin
     return (
-        <div className="max-w-4xl mx-auto space-y-8 py-10 px-4 relative">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-200 pb-5">
+        <div className="max-w-4xl mx-auto space-y-8 py-10 px-4 relative overflow-hidden">
+            {/* Ambient background glows */}
+            <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-orange-100/40 dark:bg-orange-950/10 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
+            <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-80 h-80 bg-red-100/40 dark:bg-red-950/10 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-200 dark:border-[#22222e] pb-5 relative z-10 text-start">
                 <div className="space-y-1">
-                    <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight flex items-center gap-2.5">
+                    <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight flex items-center gap-2.5">
                         <LayoutDashboard className="w-8 h-8 text-orange-500" />
-                        Admin Dashboard
+                        {t.adminDashTitle}
                     </h1>
-                    <p className="text-sm text-gray-500">
-                        Manage menu categories, items, and platform data (Logged in as <span className="font-semibold text-gray-700">{user?.email}</span>)
+                    <p className="text-sm text-gray-555 text-gray-500 dark:text-gray-400">
+                        {t.adminDashSubtitle} ({t.adminDashLoggedAs} <span className="font-semibold text-gray-700 dark:text-gray-300">{user?.email}</span>)
                     </p>
                 </div>
                 <button
                     onClick={handleSignOut}
-                    className="inline-flex items-center gap-2 bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-600 px-4 py-2 rounded-xl font-bold transition-all text-sm cursor-pointer border border-gray-200/50 hover:border-red-200"
+                    className="inline-flex items-center gap-2 bg-gray-100 dark:bg-[#1a1a24] hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 border border-gray-200/50 dark:border-[#22222e] text-gray-600 dark:text-gray-300 px-4 py-2.5 rounded-xl font-bold transition-all text-sm cursor-pointer hover:border-red-200 dark:hover:border-red-900/40"
                 >
                     <LogOut className="w-4 h-4" />
-                    Sign Out
+                    {t.adminBtnSignOut}
                 </button>
             </div>
 
             {/* --- Category Section --- */}
-            <section className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4 hover:shadow-md transition-shadow">
-                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <section className="bg-white dark:bg-[#121216]/90 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-[#22222e] space-y-4 hover:shadow-md transition-shadow relative z-10">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2 border-b pb-2.5 border-gray-50 dark:border-[#22222e]/40">
                     <Layers className="w-5 h-5 text-green-500" />
-                    1. Add Category
+                    {t.adminAddCategory}
                 </h2>
                 <div className="flex flex-col sm:flex-row gap-3 items-start w-full">
-                    <div className="flex-1 w-full space-y-1">
+                    <div className="flex-1 w-full space-y-1 text-start">
                         <input
                             type="text"
-                            placeholder="e.g. Drinks, Pizzas, Desserts"
-                            className={`border p-3.5 rounded-xl w-full text-gray-900 focus:outline-none focus:ring-2 transition-all font-medium placeholder-gray-400 ${
+                            placeholder={t.adminCatPlaceholder}
+                            className={`border p-3.5 rounded-xl w-full text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 transition-all font-medium placeholder-gray-400 dark:placeholder-gray-550 bg-gray-50/50 dark:bg-[#161622]/50 ${
                                 categoryErrors.categoryName
-                                    ? "border-red-300 focus:ring-red-500/20 focus:border-red-500"
-                                    : "border-gray-200 focus:ring-green-500/20 focus:border-green-500"
+                                    ? "border-red-300 dark:border-red-900/50 focus:ring-red-500/20 focus:border-red-500"
+                                    : "border-gray-200 dark:border-[#22222e] focus:ring-green-500/20 focus:border-green-550"
                             }`}
                             value={categoryName}
                             onChange={(e) => {
@@ -471,8 +657,8 @@ export default function AdminPage() {
                         />
                         {categoryErrors.categoryName && (
                             <span className="text-xs font-bold text-red-500 flex items-center gap-1 mt-1.5 animate-fadeIn">
-                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                                {categoryErrors.categoryName}
+                               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                               {categoryErrors.categoryName}
                             </span>
                         )}
                     </div>
@@ -484,12 +670,12 @@ export default function AdminPage() {
                         {isAddingCategory ? (
                             <>
                                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                Saving...
+                                {t.adminSaving}
                             </>
                         ) : (
                             <>
                                 <PlusCircle className="w-4 h-4" />
-                                Save Category
+                                {t.adminBtnSaveCat}
                             </>
                         )}
                     </button>
@@ -497,21 +683,21 @@ export default function AdminPage() {
             </section>
 
             {/* --- Product Section --- */}
-            <section className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4 hover:shadow-md transition-shadow">
-                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <section className="bg-white dark:bg-[#121216]/90 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-[#22222e] space-y-4 hover:shadow-md transition-shadow relative z-10 text-start">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2 border-b pb-2.5 border-gray-50 dark:border-[#22222e]/40">
                     <ShoppingBag className="w-5 h-5 text-orange-500" />
-                    2. Add New Product
+                    {t.adminAddProduct}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                        <label className="text-xs font-semibold text-gray-500">Product Name</label>
+                        <label className="text-xs font-semibold text-gray-550 dark:text-gray-400">{t.adminProdName}</label>
                         <input
                             type="text"
-                            placeholder="e.g. Double Cheeseburger"
-                            className={`w-full border p-3.5 rounded-xl text-gray-900 focus:outline-none focus:ring-2 transition-all font-medium placeholder-gray-400 ${
+                            placeholder={t.adminProdPlaceholder}
+                            className={`w-full border p-3.5 rounded-xl text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 transition-all font-medium placeholder-gray-400 dark:placeholder-gray-550 bg-gray-50/50 dark:bg-[#161622]/50 ${
                                 productErrors.productName
-                                    ? "border-red-300 focus:ring-red-500/20 focus:border-red-500"
-                                    : "border-gray-200 focus:ring-orange-500/20 focus:border-orange-500"
+                                    ? "border-red-300 dark:border-red-900/50 focus:ring-red-500/20 focus:border-red-500"
+                                    : "border-gray-200 dark:border-[#22222e] focus:ring-orange-500/20 focus:border-orange-500"
                             }`}
                             value={productName}
                             onChange={(e) => {
@@ -528,15 +714,15 @@ export default function AdminPage() {
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-xs font-semibold text-gray-500">Price (USD)</label>
+                        <label className="text-xs font-semibold text-gray-555 dark:text-gray-400">{t.adminPrice}</label>
                         <input
                             type="number"
                             step="0.01"
-                            placeholder="e.g. 12.50"
-                            className={`w-full border p-3.5 rounded-xl text-gray-900 focus:outline-none focus:ring-2 transition-all font-medium placeholder-gray-400 ${
+                            placeholder={t.adminPricePlaceholder}
+                            className={`w-full border p-3.5 rounded-xl text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 transition-all font-medium placeholder-gray-400 dark:placeholder-gray-550 bg-gray-50/50 dark:bg-[#161622]/50 ${
                                 productErrors.price
-                                    ? "border-red-300 focus:ring-red-500/20 focus:border-red-500"
-                                    : "border-gray-200 focus:ring-orange-500/20 focus:border-orange-500"
+                                    ? "border-red-300 dark:border-red-900/50 focus:ring-red-500/20 focus:border-red-500"
+                                    : "border-gray-200 dark:border-[#22222e] focus:ring-orange-500/20 focus:border-orange-500"
                             }`}
                             value={price}
                             onChange={(e) => {
@@ -553,14 +739,14 @@ export default function AdminPage() {
                     </div>
 
                     <div className="space-y-1 md:col-span-2">
-                        <label className="text-xs font-semibold text-gray-500">Product Image URL (Optional)</label>
+                        <label className="text-xs font-semibold text-gray-555 dark:text-gray-400">{t.adminImageURL}</label>
                         <input
                             type="text"
                             placeholder="e.g. https://images.unsplash.com/photo-..."
-                            className={`w-full border p-3.5 rounded-xl text-gray-900 focus:outline-none focus:ring-2 transition-all font-medium placeholder-gray-400 ${
+                            className={`w-full border p-3.5 rounded-xl text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 transition-all font-medium placeholder-gray-400 dark:placeholder-gray-550 bg-gray-50/50 dark:bg-[#161622]/50 ${
                                 productErrors.imageUrl
-                                    ? "border-red-300 focus:ring-red-500/20 focus:border-red-500"
-                                    : "border-gray-200 focus:ring-orange-500/20 focus:border-orange-500"
+                                    ? "border-red-300 dark:border-red-900/50 focus:ring-red-500/20 focus:border-red-500"
+                                    : "border-gray-200 dark:border-[#22222e] focus:ring-orange-500/20 focus:border-orange-500"
                             }`}
                             value={imageUrl}
                             onChange={(e) => {
@@ -577,12 +763,12 @@ export default function AdminPage() {
                     </div>
 
                     <div className="space-y-1 md:col-span-2">
-                        <label className="text-xs font-semibold text-gray-500">Select Category</label>
+                        <label className="text-xs font-semibold text-gray-555 dark:text-gray-400">{t.adminSelectCategory}</label>
                         <select
-                            className={`w-full border p-3.5 rounded-xl text-gray-900 focus:outline-none focus:ring-2 transition-all font-medium bg-white ${
+                            className={`w-full border p-3.5 rounded-xl text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 transition-all font-medium bg-white dark:bg-[#121216] border-gray-200 dark:border-[#22222e] ${
                                 productErrors.selectedCategory
-                                    ? "border-red-300 focus:ring-red-500/20 focus:border-red-500"
-                                    : "border-gray-200 focus:ring-orange-500/20 focus:border-orange-500"
+                                    ? "border-red-300 dark:border-red-900/50 focus:ring-red-500/20 focus:border-red-550"
+                                    : "border-gray-200 dark:border-[#22222e] focus:ring-orange-500/20 focus:border-orange-550"
                             }`}
                             value={selectedCategory}
                             onChange={(e) => {
@@ -591,10 +777,10 @@ export default function AdminPage() {
                             }}
                         >
                             {categories.length === 0 ? (
-                                <option value="">Loading categories...</option>
+                                <option value="">{lang === 'ar' ? "جاري تحميل الأقسام..." : "Loading categories..."}</option>
                             ) : (
                                 categories.map((cat) => (
-                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                    <option key={cat.id} value={cat.id}>{translateMenu(cat.name, lang)}</option>
                                 ))
                             )}
                         </select>
@@ -614,12 +800,12 @@ export default function AdminPage() {
                         {isAddingProduct ? (
                             <>
                                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                Adding Product...
+                                {lang === 'ar' ? "جاري إضافة الوجبة..." : "Adding Product..."}
                             </>
                         ) : (
                             <>
                                 <PlusCircle className="w-4 h-4" />
-                                Add Product to Menu
+                                {t.adminBtnSaveProd}
                             </>
                         )}
                     </button>
@@ -627,24 +813,24 @@ export default function AdminPage() {
             </section>
 
             {/* --- Manage Products Section --- */}
-            <section className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4 hover:shadow-md transition-shadow">
-                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <section className="bg-white dark:bg-[#121216]/90 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-[#22222e] space-y-4 hover:shadow-md transition-shadow relative z-10 text-start">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2 border-b pb-2.5 border-gray-50 dark:border-[#22222e]/40">
                     <Trash2 className="w-5 h-5 text-red-500" />
-                    3. Manage & Delete Products
+                    {t.adminManageHeader}
                 </h2>
 
                 {/* Category Pills Navigation Filter */}
                 {categories.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pb-3 border-b border-gray-100">
+                    <div className="flex flex-wrap gap-2 pb-3 border-b border-gray-100 dark:border-[#22222e]/40">
                         <button
                             onClick={() => setManageActiveCategory("all")}
                             className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
                                 manageActiveCategory === "all"
-                                    ? "bg-gray-900 text-white shadow-sm"
-                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                    ? "bg-gray-900 text-white dark:bg-orange-500 shadow-sm"
+                                    : "bg-gray-100 dark:bg-[#1a1a24] text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#232333]"
                             }`}
                         >
-                            All
+                            {lang === 'ar' ? "الكل" : "All"}
                         </button>
                         {categories.map((cat) => (
                             <button
@@ -653,43 +839,49 @@ export default function AdminPage() {
                                 className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
                                     manageActiveCategory === cat.id
                                         ? "bg-orange-500 text-white shadow-sm"
-                                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                        : "bg-gray-100 dark:bg-[#1a1a24] text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#232333]"
                                 }`}
                             >
-                                {cat.name}
+                                {translateMenu(cat.name, lang)}
                             </button>
                         ))}
                     </div>
                 )}
                 
                 {products.length === 0 ? (
-                    <p className="text-sm text-gray-500 text-center py-6">No products found in the menu.</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-6">
+                        {lang === 'ar' ? "لم يتم العثور على وجبات في القائمة." : "No products found in the menu."}
+                    </p>
                 ) : filteredManageProducts.length === 0 ? (
-                    <p className="text-sm text-gray-500 text-center py-6">No products found in this category.</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-6">
+                        {lang === 'ar' ? "لم يتم العثور على وجبات في هذا القسم." : "No products found in this category."}
+                    </p>
                 ) : (
-                    <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto pr-1">
+                    <div className="divide-y divide-gray-100 dark:divide-[#22222e]/30 max-h-96 overflow-y-auto pr-1">
                         {filteredManageProducts.map((prod) => (
                             <div key={prod.id} className="flex items-center justify-between py-3.5 first:pt-0 last:pb-0 gap-4">
-                                <div className="flex items-center gap-3 truncate">
+                                <div className="flex items-center gap-3 truncate text-start">
                                     <div
-                                        className="w-12 h-12 rounded-xl bg-cover bg-center shrink-0 border border-gray-100"
+                                        className="w-12 h-12 rounded-xl bg-cover bg-center shrink-0 border border-gray-100 dark:border-[#22222e]/40"
                                         style={{ backgroundImage: `url(${prod.image_url})` }}
                                     />
                                     <div className="truncate">
-                                        <h4 className="font-bold text-sm text-gray-900 truncate">{prod.name}</h4>
-                                        <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5">
+                                        <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100 truncate">
+                                            {translateMenu(prod.name, lang)}
+                                        </h4>
+                                        <p className="text-xs text-gray-555 text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mt-0.5">
                                             <span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-400" />
-                                            {prod.categories?.name || "Uncategorized"}
+                                            {prod.categories?.name ? translateMenu(prod.categories.name, lang) : (lang === 'ar' ? "غير مصنف" : "Uncategorized")}
                                         </p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-4 shrink-0">
-                                    <span className="font-bold text-sm text-green-600">${prod.price.toFixed(2)}</span>
+                                    <span className="font-bold text-sm text-green-600 dark:text-green-400">${prod.price.toFixed(2)}</span>
                                     <button
                                         onClick={() => handleDeleteProduct(prod.id)}
                                         disabled={isDeletingProduct === prod.id}
-                                        className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition-all cursor-pointer disabled:opacity-50 border border-red-100/50 hover:border-red-200"
-                                        title="Delete Product"
+                                        className="p-2 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 rounded-xl transition-all cursor-pointer disabled:opacity-50 border border-red-100/50 dark:border-red-900/40 hover:border-red-200"
+                                        title={t.adminBtnDelete}
                                     >
                                         {isDeletingProduct === prod.id ? (
                                             <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
@@ -705,34 +897,36 @@ export default function AdminPage() {
             </section>
 
             {/* --- Manage & Fulfill Orders Section --- */}
-            <section className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4 hover:shadow-md transition-shadow">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-gray-50 pb-3">
-                    <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <section className="bg-white dark:bg-[#121216]/90 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-[#22222e] space-y-4 hover:shadow-md transition-shadow relative z-10 text-start">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-gray-50 dark:border-[#22222e]/40 pb-3">
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                         <Truck className="w-5 h-5 text-orange-500" />
-                        4. Manage & Fulfill Orders
+                        {t.adminActiveOrdersHeader}
                     </h2>
                     <button
                         onClick={fetchAllOrders}
                         disabled={isLoadingOrders}
-                        className="inline-flex items-center gap-1 bg-gray-50 hover:bg-orange-50 hover:text-orange-500 border border-gray-200/60 text-gray-500 px-3 py-1.5 rounded-xl font-bold transition-all text-xs cursor-pointer disabled:opacity-50"
+                        className="inline-flex items-center gap-1 bg-gray-50 dark:bg-[#1a1a24] hover:bg-orange-50 dark:hover:bg-orange-950/20 hover:text-orange-500 border border-gray-200/60 dark:border-[#22222e] text-gray-550 text-gray-500 dark:text-gray-400 px-3 py-1.5 rounded-xl font-bold transition-all text-xs cursor-pointer disabled:opacity-50"
                     >
                         <RefreshCw className={`w-3 h-3 ${isLoadingOrders ? 'animate-spin' : ''}`} />
-                        Sync Orders
+                        {lang === 'ar' ? "تحديث الطلبات" : "Sync Orders"}
                     </button>
                 </div>
 
                 {isLoadingOrders && orders.length === 0 ? (
                     <div className="flex justify-center items-center py-10 space-y-2 flex-col">
                         <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-                        <p className="text-xs text-gray-400 font-semibold animate-pulse">Syncing orders...</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 font-semibold animate-pulse">
+                            {lang === 'ar' ? "جاري تحديث الطلبات..." : "Syncing orders..."}
+                        </p>
                     </div>
                 ) : orders.length === 0 ? (
-                    <p className="text-sm text-gray-500 text-center py-8">No customer orders found in the database.</p>
+                    <p className="text-sm text-gray-555 text-gray-500 dark:text-gray-400 text-center py-8">{t.adminNoOrders}</p>
                 ) : (
-                    <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto pr-1 space-y-6">
+                    <div className="divide-y divide-gray-100 dark:divide-[#22222e]/30 max-h-[550px] overflow-y-auto pr-1 space-y-6">
                         {orders.map((order) => {
                             const orderRef = `BF-${order.id.substring(0, 5).toUpperCase()}`;
-                            const dateFormatted = new Date(order.created_at).toLocaleString([], {
+                            const dateFormatted = new Date(order.created_at).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US', {
                                 month: 'short',
                                 day: 'numeric',
                                 hour: '2-digit',
@@ -749,37 +943,70 @@ export default function AdminPage() {
                             }
 
                             return (
-                                <div key={order.id} className="pt-6 first:pt-0 space-y-3.5 text-left">
+                                <div key={order.id} className="pt-6 first:pt-0 space-y-3.5 text-start">
                                     {/* Order Meta Header */}
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-gray-50/50 p-3 rounded-xl border border-gray-100/50">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-gray-50/50 dark:bg-[#1a1a24]/30 p-3 rounded-xl border border-gray-100/50 dark:border-[#22222e]/40">
                                         <div className="space-y-0.5">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-xs font-extrabold text-gray-800 tracking-wide">{orderRef}</span>
-                                                <span className="text-[10px] font-bold text-gray-400 flex items-center gap-1">
+                                                <span className="text-xs font-extrabold text-gray-800 dark:text-gray-250 tracking-wide">{orderRef}</span>
+                                                <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 flex items-center gap-1">
                                                     <Calendar className="w-3 h-3" />
                                                     {dateFormatted}
                                                 </span>
                                             </div>
-                                            <p className="text-[10px] text-gray-400 font-medium truncate max-w-[280px]">
-                                                Cust: <span className="font-semibold text-gray-600">{order.user_id || "Guest"}</span>
+                                            <p className="text-[10px] text-gray-400 dark:text-gray-500 font-medium truncate max-w-[280px]">
+                                                {lang === 'ar' ? "العميل:" : "Cust:"} <span className="font-semibold text-gray-600 dark:text-gray-300">{order.user_id || (lang === 'ar' ? "زائر" : "Guest")}</span>
                                             </p>
                                         </div>
 
                                         {/* Dropdown status changer */}
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">Status:</span>
-                                            <select
-                                                value={order.status}
-                                                onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)}
-                                                className="border border-gray-200 text-xs font-bold py-1.5 px-3 rounded-xl text-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all bg-white cursor-pointer"
+                                        <div className="flex items-center gap-2 shrink-0 relative">
+                                            <span className="text-xs font-bold text-gray-400 dark:text-gray-555 uppercase tracking-wide">
+                                                {lang === 'ar' ? "الحالة:" : "Status:"}
+                                            </span>
+                                            
+                                            <button
+                                                onClick={() => setActiveDropdownOrderId(activeDropdownOrderId === order.id ? null : order.id)}
+                                                className={`flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all duration-300 shadow-xs cursor-pointer select-none ${
+                                                    statusOptions.find(opt => opt.value === order.status)?.colorClass || ""
+                                                } ${
+                                                    statusOptions.find(opt => opt.value === order.status)?.darkColorClass || ""
+                                                }`}
                                             >
-                                                <option value="pending">Pending</option>
-                                                <option value="preparing">Preparing</option>
-                                                <option value="ready">Ready</option>
-                                                <option value="delivering">Delivering</option>
-                                                <option value="delivered">Delivered</option>
-                                                <option value="cancelled">Cancelled</option>
-                                            </select>
+                                                <span>{getStatusLabel(order.status)}</span>
+                                                <ChevronDown className={`w-3.5 h-3.5 opacity-70 transition-transform duration-300 ${activeDropdownOrderId === order.id ? 'rotate-180' : ''}`} />
+                                            </button>
+
+                                             {activeDropdownOrderId === order.id && (
+                                                 <>
+                                                     <div 
+                                                         className="fixed inset-0 z-40" 
+                                                         onClick={() => setActiveDropdownOrderId(null)} 
+                                                     />
+                                                     
+                                                     <div className={`absolute top-full ${lang === 'ar' ? 'left-0' : 'right-0'} mt-1.5 w-44 rounded-2xl bg-white dark:bg-[#1a1a24] border border-gray-100 dark:border-[#2b2b3b]/60 shadow-xl py-2 z-50 animate-fadeIn overflow-hidden`}>
+                                                         {statusOptions.map((opt) => (
+                                                             <button
+                                                                 key={opt.value}
+                                                                 onClick={() => {
+                                                                     handleUpdateOrderStatus(order.id, opt.value);
+                                                                     setActiveDropdownOrderId(null);
+                                                                 }}
+                                                                 className={`w-full text-start px-4 py-2 text-xs font-bold transition-colors flex items-center justify-between cursor-pointer ${
+                                                                     order.status === opt.value
+                                                                         ? "bg-orange-50 text-orange-600 dark:bg-orange-950/20 dark:text-orange-400"
+                                                                         : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-[#232333]/50"
+                                                                 }`}
+                                                             >
+                                                                 <span>{lang === 'ar' ? opt.labelAr : opt.labelEn}</span>
+                                                                 {order.status === opt.value && (
+                                                                     <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                                                                 )}
+                                                             </button>
+                                                         ))}
+                                                     </div>
+                                                 </>
+                                             )}
                                         </div>
                                     </div>
 
@@ -787,32 +1014,34 @@ export default function AdminPage() {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                                         {/* Left col: list items */}
                                         <div className="space-y-1">
-                                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-0.5">Items</span>
-                                            <div className="bg-white rounded-xl border border-gray-100 p-3 divide-y divide-gray-50 space-y-1.5">
+                                            <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest pl-0.5">
+                                                {lang === 'ar' ? "الوجبات المطلوبة" : "Items"}
+                                            </span>
+                                            <div className="bg-white dark:bg-[#121216] rounded-xl border border-gray-100 dark:border-[#22222e] p-3 divide-y divide-gray-50 dark:divide-[#22222e]/30 space-y-1.5">
                                                 {metaData && metaData.items ? (
                                                     metaData.items.map((metaItem: MetaItem, idx: number) => (
-                                                        <div key={idx} className="py-2 first:pt-0 last:pb-0 text-left">
+                                                        <div key={idx} className="py-2 first:pt-0 last:pb-0 text-start">
                                                             <div className="flex justify-between items-start gap-4">
-                                                                <span className="font-semibold text-gray-800">
-                                                                    {metaItem.name} <span className="font-bold text-gray-500">x{metaItem.quantity}</span>
+                                                                <span className="font-semibold text-gray-800 dark:text-gray-200">
+                                                                    {translateMenu(metaItem.name, lang)} <span className="font-bold text-gray-500 dark:text-gray-450">x{metaItem.quantity}</span>
                                                                 </span>
-                                                                <span className="font-bold text-gray-900 shrink-0">${(metaItem.price * metaItem.quantity).toFixed(2)}</span>
+                                                                <span className="font-bold text-gray-900 dark:text-gray-100 shrink-0">${(metaItem.price * metaItem.quantity).toFixed(2)}</span>
                                                             </div>
                                                             {metaItem.customization && (
-                                                                <div className="text-[10px] text-gray-400 font-semibold space-y-0.5 mt-0.5 pl-1.5 border-l border-orange-500/30">
+                                                                <div className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold space-y-0.5 mt-0.5 ps-1.5 border-s border-orange-500/30 text-start">
                                                                     {metaItem.customization.size && (
                                                                         <p className="leading-tight">
-                                                                            Portion: <span className="text-gray-600 font-bold">{metaItem.customization.size}</span>
+                                                                            {lang === 'ar' ? "الحجم:" : "Portion:"} <span className="text-gray-600 dark:text-gray-300 font-bold">{translateAddon(metaItem.customization.size, lang)}</span>
                                                                         </p>
                                                                     )}
                                                                     {(metaItem.customization.addons && metaItem.customization.addons.length > 0) && (
                                                                         <p className="leading-tight">
-                                                                            Add-ons: <span className="text-orange-500">{metaItem.customization.addons.join(", ")}</span>
+                                                                            {lang === 'ar' ? "الإضافات:" : "Add-ons:"} <span className="text-orange-500 dark:text-orange-450">{metaItem.customization.addons.map(add => translateAddon(add, lang)).join(", ")}</span>
                                                                         </p>
                                                                     )}
                                                                     {metaItem.customization.instructions && (
-                                                                        <p className="italic text-gray-400 font-normal leading-tight">
-                                                                            Note: &quot;{metaItem.customization.instructions}&quot;
+                                                                        <p className="italic text-gray-400 dark:text-gray-550 font-normal leading-tight">
+                                                                            {lang === 'ar' ? "ملاحظة:" : "Note:"} &quot;{metaItem.customization.instructions}&quot;
                                                                         </p>
                                                                     )}
                                                                 </div>
@@ -822,48 +1051,55 @@ export default function AdminPage() {
                                                 ) : (
                                                     order.order_items?.map((item, idx) => (
                                                         <div key={idx} className="flex justify-between items-center py-1.5 first:pt-0 last:pb-0">
-                                                            <span className="font-medium text-gray-700">
-                                                                {item.products?.name || "Deleted Dish"} <span className="font-bold text-gray-500">x{item.quantity}</span>
+                                                            <span className="font-medium text-gray-700 dark:text-gray-300">
+                                                                {item.products ? translateMenu(item.products.name, lang) : (lang === 'ar' ? "طبق محذوف" : "Deleted Dish")} <span className="font-bold text-gray-500 dark:text-gray-450">x{item.quantity}</span>
                                                             </span>
-                                                            <span className="font-bold text-gray-900">${(item.price_at_time * item.quantity).toFixed(2)}</span>
+                                                            <span className="font-bold text-gray-900 dark:text-gray-150">${(item.price_at_time * item.quantity).toFixed(2)}</span>
                                                         </div>
                                                     ))
                                                 )}
-                                                <div className="flex justify-between border-t border-gray-50 pt-2 font-extrabold text-orange-600 text-sm">
-                                                    <span>Grand Total</span>
+                                                <div className="flex justify-between border-t border-gray-50 dark:border-[#22222e]/40 pt-2 font-extrabold text-orange-600 dark:text-orange-450 text-sm">
+                                                    <span>{lang === 'ar' ? "المجموع الكلي" : "Grand Total"}</span>
                                                     <span>${order.total_price.toFixed(2)}</span>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        {/* Right col: Delivery metadata details */}
+                                        {/* Right col: Delivery metadata info */}
                                         <div className="space-y-1">
-                                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-0.5">Delivery info</span>
-                                            <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-2 text-gray-600 font-medium">
+                                            <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest pl-0.5">
+                                                {lang === 'ar' ? "تفاصيل التوصيل" : "Delivery info"}
+                                            </span>
+                                            <div className="bg-white dark:bg-[#121216] rounded-xl border border-gray-100 dark:border-[#22222e] p-3 space-y-2 text-gray-650 text-gray-600 dark:text-gray-300 font-medium">
                                                 {metaData ? (
                                                     <>
                                                         <div>
-                                                            <span className="text-[9px] font-bold text-gray-400 uppercase block tracking-wider">Recipient Name</span>
-                                                            <span className="text-gray-800 font-semibold text-xs">{metaData.fullName}</span>
+                                                            <span className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase block tracking-wider">{t.successRecipient}</span>
+                                                            <span className="text-gray-800 dark:text-gray-200 font-semibold text-xs">{metaData.fullName}</span>
                                                         </div>
                                                         <div>
-                                                            <span className="text-[9px] font-bold text-gray-400 uppercase block tracking-wider">Recipient Destination</span>
-                                                            <span className="text-gray-800 text-xs">{metaData.address}, {metaData.city}</span>
+                                                            <span className="text-[9px] font-bold text-gray-400 dark:text-gray-550 uppercase block tracking-wider">{t.successDestination}</span>
+                                                            <span className="text-gray-800 dark:text-gray-200 text-xs">{metaData.address}, {metaData.city}</span>
                                                         </div>
                                                         <div className="grid grid-cols-2 gap-2">
                                                             <div>
-                                                                <span className="text-[9px] font-bold text-gray-400 uppercase block tracking-wider">Recipient Phone</span>
-                                                                <span className="text-gray-800 text-xs">{metaData.phoneNumber}</span>
+                                                                <span className="text-[9px] font-bold text-gray-400 dark:text-gray-550 uppercase block tracking-wider">{t.successPhone}</span>
+                                                                <span className="text-gray-800 dark:text-gray-200 text-xs">{metaData.phoneNumber}</span>
                                                             </div>
                                                             <div>
-                                                                <span className="text-[9px] font-bold text-gray-400 uppercase block tracking-wider">Payment Method</span>
-                                                                <span className="text-gray-800 text-xs uppercase font-bold">{metaData.paymentMethod}</span>
+                                                                <span className="text-[9px] font-bold text-gray-400 dark:text-gray-550 uppercase block tracking-wider">{t.successPayment}</span>
+                                                                <span className="text-gray-800 dark:text-gray-200 text-xs uppercase font-bold">
+                                                                    {metaData.paymentMethod === 'card' ? t.checkoutPaymentCard : t.checkoutPaymentCod}
+                                                                </span>
                                                             </div>
                                                         </div>
                                                     </>
                                                 ) : (
-                                                    <div className="text-gray-400 text-xs text-center py-6 italic font-normal">
-                                                        No local metadata cache exists for this order. Showing placeholder defaults.
+                                                    <div className="text-gray-400 dark:text-gray-550 text-xs text-center py-6 italic font-normal">
+                                                        {lang === 'ar'
+                                                            ? "لا يوجد تفاصيل شحن محفوظة محلياً لهذا الطلب."
+                                                            : "No local metadata cache exists for this order. Showing placeholder defaults."
+                                                        }
                                                     </div>
                                                 )}
                                             </div>
