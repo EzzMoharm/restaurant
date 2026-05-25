@@ -109,7 +109,7 @@ export default function Navbar() {
     return (
         <nav className="sticky top-0 z-50 w-full bg-white border-b border-gray-100 shadow-sm dark:bg-[#121216] dark:border-[#22222e] transition-colors duration-300">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex justify-between items-center h-16">
+                <div className="relative flex justify-between items-center h-16">
 
                     {/* Logo / Brand */}
                     <Link href="/" className="flex items-center gap-2">
@@ -119,7 +119,7 @@ export default function Navbar() {
                     </Link>
 
                     {/* Desktop Links (Hidden on mobile) */}
-                    <div className="hidden md:flex items-center space-x-8">
+                    <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center space-x-8">
                         <Link href="/" className="text-gray-600 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 font-medium transition-colors">
                             {t.navMenu}
                         </Link>
