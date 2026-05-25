@@ -3,8 +3,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ShoppingCart, Menu as MenuIcon, X, LogOut, Shield } from "lucide-react";
+import { ShoppingCart, Menu as MenuIcon, X, LogOut, Shield, Sun, Moon, Globe } from "lucide-react";
 import { useCartStore } from "@/store/cart";
+import { useSettingsStore } from "@/store/settings";
+import { useTranslation } from "@/lib/translations";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { isUserAdmin } from "@/lib/supabase/admin";
@@ -13,6 +15,8 @@ import toast from "react-hot-toast";
 
 export default function Navbar() {
     const router = useRouter();
+    const { t, lang } = useTranslation();
+    const { theme, toggleTheme, toggleLang } = useSettingsStore();
     const totalItems = useCartStore((state) => state.totalItems());
     const openCart = useCartStore((state) => state.openCart);
 
@@ -103,43 +107,62 @@ export default function Navbar() {
     }
 
     return (
-        <nav className="sticky top-0 z-50 w-full bg-white border-b border-gray-100 shadow-sm">
+        <nav className="sticky top-0 z-50 w-full bg-white border-b border-gray-100 shadow-sm dark:bg-[#121216] dark:border-[#22222e] transition-colors duration-300">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center h-16">
 
                     {/* Logo / Brand */}
                     <Link href="/" className="flex items-center gap-2">
-                        <span className="text-2xl font-extrabold tracking-tight text-gray-900">
+                        <span className="text-2xl font-extrabold tracking-tight text-gray-900 dark:text-gray-100">
                             Bite<span className="text-orange-500">Flow</span>
                         </span>
                     </Link>
 
                     {/* Desktop Links (Hidden on mobile) */}
                     <div className="hidden md:flex items-center space-x-8">
-                        <Link href="/" className="text-gray-600 hover:text-orange-500 font-medium transition-colors">
-                            Menu
+                        <Link href="/" className="text-gray-600 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 font-medium transition-colors">
+                            {t.navMenu}
                         </Link>
                         {user && (
-                            <Link href="/orders" className="text-gray-600 hover:text-orange-500 font-medium transition-colors">
-                                My Orders
+                            <Link href="/orders" className="text-gray-600 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 font-medium transition-colors">
+                                {t.navMyOrders}
                             </Link>
                         )}
                         {isAdmin && (
-                            <Link href="/admin" className="inline-flex items-center gap-1.5 text-gray-600 hover:text-orange-500 font-medium transition-colors">
+                            <Link href="/admin" className="inline-flex items-center gap-1.5 text-gray-600 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 font-medium transition-colors">
                                 <Shield className="w-4 h-4 text-orange-500" />
-                                Admin Dashboard
+                                {t.navAdmin}
                             </Link>
                         )}
                     </div>
 
-                    {/* Actions (Cart & Mobile Toggle) */}
-                    <div className="flex items-center gap-2 sm:gap-4">
+                    {/* Actions (Cart, Theme, Lang & Mobile Toggle) */}
+                    <div className="flex items-center gap-2 sm:gap-3">
+
+                        {/* Language Switcher Button */}
+                        <button 
+                            onClick={toggleLang} 
+                            className="flex items-center gap-1 p-2 text-gray-600 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 transition-colors cursor-pointer rounded-xl hover:bg-gray-50 dark:hover:bg-[#1a1a24]"
+                            title={lang === 'en' ? 'تغيير اللغة إلى العربية' : 'Switch to English'}
+                        >
+                            <Globe className="w-5 h-5 shrink-0" />
+                            <span className="text-xs font-black uppercase tracking-wider">{lang === 'en' ? 'AR' : 'EN'}</span>
+                        </button>
+
+                        {/* Theme Toggle Button */}
+                        <button 
+                            onClick={toggleTheme} 
+                            className="p-2 text-gray-600 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 transition-colors cursor-pointer rounded-xl hover:bg-gray-50 dark:hover:bg-[#1a1a24]"
+                            title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+                        >
+                            {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                        </button>
 
                         {/* Cart Button */}
-                        <button onClick={openCart} className="relative p-2 text-gray-600 hover:text-orange-500 transition-colors cursor-pointer">
-                            <ShoppingCart className="w-6 h-6" />
+                        <button onClick={openCart} className="relative p-2 text-gray-600 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 transition-colors cursor-pointer rounded-xl hover:bg-gray-50 dark:hover:bg-[#1a1a24]">
+                            <ShoppingCart className="w-5 h-5" />
                             {isMounted && totalItems > 0 && (
-                                <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/4 -translate-y-1/4 bg-orange-500 rounded-full animate-pulse">
+                                <span className="absolute top-1 right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-[9px] font-bold leading-none text-white transform translate-x-1/4 -translate-y-1/4 bg-orange-500 rounded-full animate-pulse">
                                     {totalItems}
                                 </span>
                             )}
@@ -149,7 +172,7 @@ export default function Navbar() {
                         {isMounted && (
                             <div className="hidden md:flex items-center gap-3">
                                 {user ? (
-                                    <div className="flex items-center gap-3 bg-gray-50 pl-3 pr-2 py-1.5 rounded-xl border border-gray-100">
+                                    <div className="flex items-center gap-3 bg-gray-50 dark:bg-[#1a1a24] pl-3 pr-2 py-1.5 rounded-xl border border-gray-100 dark:border-[#22222e]">
                                         <Link href="/profile" className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer" title="View Profile">
                                             <div className="w-6 h-6 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-xs font-bold uppercase overflow-hidden">
                                                 {avatarUrl ? (
@@ -163,14 +186,14 @@ export default function Navbar() {
                                                     (user.user_metadata?.username || user.email || "U").charAt(0)
                                                 )}
                                             </div>
-                                            <span className="text-xs font-medium text-gray-600 max-w-[120px] truncate">
+                                            <span className="text-xs font-semibold text-gray-600 dark:text-gray-300 max-w-[100px] truncate">
                                                 {user.user_metadata?.username || user.email}
                                             </span>
                                         </Link>
                                         <button
                                             onClick={handleSignOut}
-                                            title="Sign Out"
-                                            className="p-1.5 text-gray-400 hover:text-red-500 transition-colors cursor-pointer rounded-lg hover:bg-white"
+                                            title={t.navSignOut}
+                                            className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors cursor-pointer rounded-lg hover:bg-white dark:hover:bg-[#121216]"
                                         >
                                             <LogOut className="w-4 h-4" />
                                         </button>
@@ -178,9 +201,9 @@ export default function Navbar() {
                                 ) : (
                                     <Link
                                         href="/login"
-                                        className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-600 hover:text-orange-700 transition-colors py-2 px-4 rounded-xl bg-orange-50 hover:bg-orange-100/80 border border-orange-200/50"
+                                        className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 transition-colors py-2 px-4 rounded-xl bg-orange-50 hover:bg-orange-100/80 border border-orange-200/50 dark:bg-orange-950/20 dark:border-orange-900/40"
                                     >
-                                        Sign In
+                                        {t.navSignIn}
                                     </Link>
                                 )}
                             </div>
@@ -189,9 +212,9 @@ export default function Navbar() {
                         {/* Mobile Menu Toggle Button */}
                         <button
                             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                            className="md:hidden p-2 text-gray-600 cursor-pointer hover:text-orange-500 transition-colors"
+                            className="md:hidden p-2 text-gray-600 dark:text-gray-300 cursor-pointer hover:text-orange-500 dark:hover:text-orange-400 transition-colors rounded-xl hover:bg-gray-50 dark:hover:bg-[#1a1a24]"
                         >
-                            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <MenuIcon className="w-6 h-6" />}
+                            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <MenuIcon className="w-5 h-5" />}
                         </button>
                     </div>
 
@@ -208,7 +231,7 @@ export default function Navbar() {
 
             {/* Mobile Menu Dropdown UI */}
             <div
-                className={`md:hidden bg-white border-t border-gray-100 shadow-lg absolute w-full left-0 right-0 z-40 transition-all duration-300 ease-out origin-top ${
+                className={`md:hidden bg-white dark:bg-[#121216] border-t border-gray-100 dark:border-[#22222e] shadow-lg absolute w-full left-0 right-0 z-40 transition-all duration-300 ease-out origin-top ${
                     isMobileMenuOpen 
                         ? "opacity-100 scale-y-100 translate-y-0 pointer-events-auto" 
                         : "opacity-0 scale-y-95 -translate-y-2 pointer-events-none"
@@ -218,32 +241,32 @@ export default function Navbar() {
                     <Link
                         href="/"
                         onClick={() => setIsMobileMenuOpen(false)}
-                        className="block px-3 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-orange-50 transition-colors"
+                        className="block px-3 py-3 rounded-xl text-base font-medium text-gray-700 dark:text-gray-300 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950/20 transition-colors"
                     >
-                        Menu
+                        {t.navMenu}
                     </Link>
                     {user && (
                         <Link
                             href="/orders"
                             onClick={() => setIsMobileMenuOpen(false)}
-                            className="block px-3 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-orange-50 transition-colors"
+                            className="block px-3 py-3 rounded-xl text-base font-medium text-gray-700 dark:text-gray-300 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950/20 transition-colors"
                         >
-                            My Orders
+                            {t.navMyOrders}
                         </Link>
                     )}
                     {isAdmin && (
                         <Link
                             href="/admin"
                             onClick={() => setIsMobileMenuOpen(false)}
-                            className="block px-3 py-3 rounded-xl text-base font-medium text-orange-600 hover:bg-orange-50 transition-colors"
+                            className="block px-3 py-3 rounded-xl text-base font-medium text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/20 transition-colors"
                         >
-                            Admin Dashboard
+                            {t.navAdmin}
                         </Link>
                     )}
                     
                     {/* Mobile Auth Button */}
                     {isMounted && (
-                        <div className="border-t border-gray-100 pt-3 mt-2">
+                        <div className="border-t border-gray-100 dark:border-[#22222e] pt-3 mt-2">
                             {user ? (
                                 <div className="space-y-3 px-3">
                                     <Link 
@@ -265,27 +288,27 @@ export default function Navbar() {
                                             )}
                                         </div>
                                         <div className="flex flex-col truncate">
-                                            <span className="text-xs font-semibold text-gray-400">Logged in as</span>
-                                            <span className="text-sm font-bold text-gray-700 truncate">
+                                            <span className="text-xs font-semibold text-gray-400 dark:text-gray-500">{t.navLoggedInAs}</span>
+                                            <span className="text-sm font-bold text-gray-700 dark:text-gray-300 truncate">
                                                 {user.user_metadata?.username || user.email}
                                             </span>
                                         </div>
                                     </Link>
                                     <button
                                         onClick={handleSignOut}
-                                        className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
+                                        className="w-full bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/40 dark:text-red-400 font-bold py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
                                     >
                                         <LogOut className="w-4 h-4" />
-                                        Sign Out
+                                        {t.navSignOut}
                                     </button>
                                 </div>
                             ) : (
                                 <Link
                                     href="/login"
                                     onClick={() => setIsMobileMenuOpen(false)}
-                                    className="block px-3 py-3 rounded-xl text-base font-bold text-orange-600 hover:bg-orange-50 transition-colors"
+                                    className="block px-3 py-3 rounded-xl text-base font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/20 transition-colors"
                                 >
-                                    Sign In
+                                    {t.navSignIn}
                                 </Link>
                             )}
                         </div>

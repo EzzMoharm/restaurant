@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
+import { useTranslation, translateMenu } from "@/lib/translations";
 
 interface ProductData {
     name: string;
@@ -23,24 +24,59 @@ interface OrderItem {
     products: ProductData | null;
 }
 
+interface MetaCustomization {
+    size?: string;
+    addons?: string[];
+    instructions?: string;
+}
+
+interface MetaItem {
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+    customization?: MetaCustomization;
+}
+
 interface OrderMeta {
     fullName: string;
     address: string;
     city: string;
     phoneNumber: string;
     paymentMethod: string;
-    items: {
-        id: string;
-        name: string;
-        price: number;
-        quantity: number;
-    }[];
+    items: MetaItem[];
     discountAmount: number;
     grandTotal: number;
     createdAt: string;
 }
 
+const translateAddon = (addon: string, lang: string) => {
+    if (addon && lang === 'ar') {
+        const map: Record<string, string> = {
+            "Extra Cheese": "جبنة إضافية",
+            "Gluten-Free Base": "عجينة خالية من الغلوتين",
+            "Spicy Jalapeno": "هالبينو حار",
+            "Truffle Oil Drizzle": "زيت الترفل",
+            "Extra Patty": "شريحة لحم إضافية",
+            "Avocado Slices": "شرائح أفوكادو",
+            "Vanilla Ice Cream Scoop": "كرة آيس كريم فانيليا",
+            "Mint Sprig": "غصن نعناع",
+            "Whipped Cream": "كريمة مخفوقة",
+            "Chocolate Sauce": "صلصة الشوكولاتة",
+            "No Sugar": "بدون سكر",
+            "Less Ice": "ثلج قليل",
+            "Extra Shot": "جرعة إضافية",
+            "Regular": "عادي",
+            "Medium": "متوسط",
+            "Large": "كبير"
+        };
+        return map[addon] || addon;
+    }
+    return addon;
+};
+
 export default function OrderSuccessPage() {
+    const { t, lang } = useTranslation();
     const [orderId, setOrderId] = useState<string | null>(null);
     const [orderStatus, setOrderStatus] = useState<string>("pending");
     const [totalPrice, setTotalPrice] = useState<number>(0);
@@ -68,7 +104,6 @@ export default function OrderSuccessPage() {
         // 1. Initial fetch from database and localStorage
         async function fetchOrderDetails() {
             try {
-                // Fetch from Supabase with order items relation
                 const { data, error } = await supabase
                     .from("orders")
                     .select(`
@@ -125,30 +160,36 @@ export default function OrderSuccessPage() {
             if (!error && data) {
                 if (data.status !== orderStatus) {
                     setOrderStatus(data.status);
-                    toast.success(`Order status: ${getStatusLabel(data.status)}`, {
-                        style: {
-                            border: '1px solid #F59E0B',
-                            padding: '12px',
-                            color: '#78350F',
-                            fontWeight: 'bold',
-                            fontSize: '14px'
+                    toast.success(
+                        lang === 'ar'
+                            ? `حالة الطلب الحالية: ${getStatusLabel(data.status)}`
+                            : `Order status: ${getStatusLabel(data.status)}`,
+                        {
+                            style: {
+                                border: '1px solid #F59E0B',
+                                padding: '12px',
+                                color: '#78350F',
+                                fontWeight: 'bold',
+                                fontSize: '14px'
+                            }
                         }
-                    });
+                    );
                 }
             }
         }, 5000);
 
         return () => clearInterval(interval);
-    }, [orderId, orderStatus]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [orderId, orderStatus, lang]);
 
     function getStatusLabel(status: string) {
         switch (status) {
-            case "pending": return "Order Received";
-            case "preparing": return "Preparing in Kitchen";
-            case "ready": return "Ready for Pickup / Delivery";
-            case "delivering": return "Out for Delivery";
-            case "delivered": return "Delivered & Arrived";
-            case "cancelled": return "Cancelled";
+            case "pending": return lang === 'ar' ? "تم استلام الطلب" : "Order Received";
+            case "preparing": return lang === 'ar' ? "تحضير الطعام في المطبخ" : "Preparing in Kitchen";
+            case "ready": return lang === 'ar' ? "جاهز للاستلام / التوصيل" : "Ready for Pickup / Delivery";
+            case "delivering": return lang === 'ar' ? "خارج للتوصيل" : "Out for Delivery";
+            case "delivered": return lang === 'ar' ? "تم التوصيل بنجاح" : "Delivered & Arrived";
+            case "cancelled": return lang === 'ar' ? "تم الإلغاء" : "Cancelled";
             default: return status;
         }
     }
@@ -169,7 +210,9 @@ export default function OrderSuccessPage() {
         return (
             <div className="min-h-[80vh] flex flex-col justify-center items-center space-y-4">
                 <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-gray-500 font-medium animate-pulse">Locating Live Order Tracker...</p>
+                <p className="text-gray-500 dark:text-gray-400 font-medium animate-pulse">
+                    {lang === 'ar' ? "تحديد موقع تتبع الطلب المباشر..." : "Locating Live Order Tracker..."}
+                </p>
             </div>
         );
     }
@@ -178,11 +221,11 @@ export default function OrderSuccessPage() {
     const orderRef = orderId ? `BF-${orderId.substring(0, 5).toUpperCase()}` : "BF-MOCK";
 
     const steps = [
-        { label: "Received", desc: "Chef approved", icon: CheckCircle2 },
-        { label: "Cooking", desc: "In the kitchen", icon: Utensils },
-        { label: "Ready", desc: "Quality packed", icon: Sparkles },
-        { label: "On the Way", desc: "Out for delivery", icon: Truck },
-        { label: "Arrived", desc: "Delivered safely", icon: MapPin }
+        { label: t.successStepReceived, desc: t.successStepReceivedDesc, icon: CheckCircle2 },
+        { label: t.successStepCooking, desc: t.successStepCookingDesc, icon: Utensils },
+        { label: t.successStepReady, desc: t.successStepReadyDesc, icon: Sparkles },
+        { label: t.successStepWay, desc: t.successStepWayDesc, icon: Truck },
+        { label: t.successStepArrived, desc: t.successStepArrivedDesc, icon: MapPin }
     ];
 
     // Subtotals Calculations
@@ -199,30 +242,34 @@ export default function OrderSuccessPage() {
                 <div className="absolute inset-0 pointer-events-none z-0 opacity-10 animate-pulse bg-gradient-to-br from-green-500/20 via-transparent to-green-500/20 rounded-3xl blur-3xl"></div>
             )}
 
+            {/* Ambient background glows */}
+            <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-orange-100/40 dark:bg-orange-950/10 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
+            <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-80 h-80 bg-red-100/40 dark:bg-red-950/10 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
+
             {/* Title / Back Shortcut */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-100 pb-5">
-                <div className="space-y-1">
-                    <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
-                        {orderStatus === "cancelled" ? "Order Cancelled" : "Live Order Tracker"}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-100 dark:border-[#22222e] pb-5 relative z-10">
+                <div className="space-y-1 text-left">
+                    <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">
+                        {orderStatus === "cancelled" ? t.successCancelled : t.successTitle}
                     </h1>
-                    <p className="text-sm text-gray-500 font-medium">
-                        Reference: <span className="font-extrabold text-gray-800 tracking-wide">{orderRef}</span>
-                        {orderMeta?.createdAt && ` • Placed at ${new Date(orderMeta.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                    <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                        {t.successRef}: <span className="font-extrabold text-gray-800 dark:text-gray-200 tracking-wide">{orderRef}</span>
+                        {orderMeta?.createdAt && ` • ${t.successPlacedAt} ${new Date(orderMeta.createdAt).toLocaleTimeString(lang === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}`}
                     </p>
                 </div>
                 <div className="flex gap-2.5">
                     <Link
                         href="/orders"
-                        className="inline-flex items-center gap-2 bg-gray-900 hover:bg-orange-500 hover:text-white text-gray-100 px-4 py-2.5 rounded-xl font-bold transition-all text-xs cursor-pointer shadow-sm"
+                        className="inline-flex items-center gap-2 bg-gray-900 dark:bg-orange-600 hover:bg-orange-500 dark:hover:bg-orange-500 text-gray-100 dark:text-white px-4 py-2.5 rounded-xl font-bold transition-all text-xs cursor-pointer shadow-sm"
                     >
-                        View Order History
+                        {t.btnViewOrderHistory}
                     </Link>
                     <Link
                         href="/"
-                        className="inline-flex items-center gap-2 bg-orange-50 hover:bg-orange-100/80 text-orange-600 px-4 py-2.5 rounded-xl font-bold transition-all text-xs cursor-pointer border border-orange-200/50"
+                        className="inline-flex items-center gap-2 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100/80 text-orange-600 dark:text-orange-400 px-4 py-2.5 rounded-xl font-bold transition-all text-xs cursor-pointer border border-orange-200/50 dark:border-orange-900/40"
                     >
-                        Back to Menu
-                        <ArrowRight className="w-3.5 h-3.5" />
+                        {t.btnBackMenu}
+                        <ArrowRight className={`w-3.5 h-3.5 ${lang === 'ar' ? 'rotate-180' : ''}`} />
                     </Link>
                 </div>
             </div>
@@ -233,28 +280,35 @@ export default function OrderSuccessPage() {
                 {/* Left Column: Progress Stepper */}
                 <div className="lg:col-span-7 space-y-6">
                     {orderStatus === "cancelled" ? (
-                        <div className="bg-red-50/80 border border-red-100 p-8 rounded-3xl text-center space-y-4">
-                            <div className="inline-flex p-4 bg-red-100 text-red-600 rounded-full scale-110">
+                        <div className="bg-red-50/80 dark:bg-red-950/10 border border-red-100 dark:border-red-900/30 p-8 rounded-3xl text-center space-y-4">
+                            <div className="inline-flex p-4 bg-red-100 dark:bg-red-950/30 text-red-600 dark:text-red-400 rounded-full scale-110">
                                 <XCircle className="w-12 h-12" />
                             </div>
                             <div className="space-y-2">
-                                <h3 className="text-xl font-extrabold text-red-950">This order has been cancelled</h3>
-                                <p className="text-sm text-red-700/80 max-w-md mx-auto leading-relaxed">
-                                    We are sorry, but your order has been cancelled by the kitchen team. If payment was made, your refund has been processed.
+                                <h3 className="text-xl font-extrabold text-red-950 dark:text-red-200">
+                                    {lang === 'ar' ? "تم إلغاء هذا الطلب" : "This order has been cancelled"}
+                                </h3>
+                                <p className="text-sm text-red-700/80 dark:text-red-400/80 max-w-md mx-auto leading-relaxed">
+                                    {lang === 'ar' 
+                                        ? "معذرة، ولكن تم إلغاء طلبك من قبل فريق المطبخ. إذا تم الدفع، فقد تم معالجة استرداد أموالك." 
+                                        : "We are sorry, but your order has been cancelled by the kitchen team. If payment was made, your refund has been processed."
+                                    }
                                 </p>
                             </div>
                         </div>
                     ) : (
-                        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-100 shadow-sm space-y-8 relative">
+                        <div className="bg-white dark:bg-[#121216]/90 p-6 sm:p-8 rounded-3xl border border-gray-100 dark:border-[#22222e] shadow-sm space-y-8 relative">
                             {/* Live Sync pulsing tag */}
-                            <div className="absolute top-6 right-6 inline-flex items-center gap-1.5 bg-orange-50 text-orange-600 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider animate-pulse border border-orange-100">
+                            <div className="absolute top-6 right-6 inline-flex items-center gap-1.5 bg-orange-50 dark:bg-orange-950/20 text-orange-600 dark:text-orange-400 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider animate-pulse border border-orange-100 dark:border-orange-900/40">
                                 <RefreshCw className="w-2.5 h-2.5 animate-spin" />
-                                Live Polling
+                                {lang === 'ar' ? "تحديث مباشر" : "Live Polling"}
                             </div>
 
                             <div className="space-y-1 text-left">
-                                <span className="text-xs font-bold text-orange-500 uppercase tracking-widest">Fulfillment Stage</span>
-                                <h2 className="text-xl font-extrabold text-gray-900">
+                                <span className="text-xs font-bold text-orange-500 dark:text-orange-450 uppercase tracking-widest">
+                                    {lang === 'ar' ? "مرحلة تلبية الطلب" : "Fulfillment Stage"}
+                                </span>
+                                <h2 className="text-xl font-extrabold text-gray-900 dark:text-gray-100">
                                     {getStatusLabel(orderStatus)}
                                 </h2>
                             </div>
@@ -262,7 +316,7 @@ export default function OrderSuccessPage() {
                             {/* Stepper Timeline */}
                             <div className="relative pl-1 space-y-8">
                                 {/* Connecting line */}
-                                <div className="absolute top-3 bottom-3 left-6 sm:left-7 w-0.5 bg-gray-100 -z-1">
+                                <div className="absolute top-3 bottom-3 left-6 sm:left-7 w-0.5 bg-gray-100 dark:bg-[#22222e] -z-1">
                                     {/* Active filled line */}
                                     <div 
                                         className="w-full bg-gradient-to-b from-green-500 to-orange-500 transition-all duration-1000 ease-in-out" 
@@ -284,11 +338,11 @@ export default function OrderSuccessPage() {
                                                         <Check className="w-5 h-5 sm:w-6 sm:h-6 stroke-[3px]" />
                                                     </div>
                                                 ) : isActive ? (
-                                                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-orange-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-orange-500/30 transition-all scale-110 ring-4 ring-orange-100 animate-pulse">
+                                                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-orange-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-orange-500/30 transition-all scale-110 ring-4 ring-orange-100 dark:ring-orange-950/40 animate-pulse">
                                                         <StepIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                                                     </div>
                                                 ) : (
-                                                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-50 text-gray-400 border border-gray-200 rounded-full flex items-center justify-center transition-all scale-95">
+                                                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-50 dark:bg-[#1a1a24] text-gray-400 border border-gray-200 dark:border-[#22222e] rounded-full flex items-center justify-center transition-all scale-95">
                                                         <StepIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                                                     </div>
                                                 )}
@@ -296,10 +350,10 @@ export default function OrderSuccessPage() {
 
                                             {/* Step Text Info */}
                                             <div className="space-y-0.5 pt-1.5 text-left">
-                                                <h4 className={`text-sm sm:text-base font-extrabold ${isActive ? 'text-orange-600' : isCompleted ? 'text-green-600' : 'text-gray-400'}`}>
+                                                <h4 className={`text-sm sm:text-base font-extrabold ${isActive ? 'text-orange-600 dark:text-orange-400' : isCompleted ? 'text-green-600' : 'text-gray-400 dark:text-gray-500'}`}>
                                                     {step.label}
                                                 </h4>
-                                                <p className={`text-xs ${isActive ? 'text-gray-600' : 'text-gray-400'}`}>
+                                                <p className={`text-xs ${isActive ? 'text-gray-600 dark:text-gray-300' : 'text-gray-400 dark:text-gray-500'}`}>
                                                     {step.desc}
                                                 </p>
                                             </div>
@@ -310,14 +364,14 @@ export default function OrderSuccessPage() {
 
                             {/* Delivery ETA Alert */}
                             {currentStep >= 0 && currentStep < 4 && (
-                                <div className="bg-orange-50/50 border border-orange-100/50 p-4 rounded-2xl flex items-start gap-3 text-sm text-left">
-                                    <div className="p-2 bg-orange-100 text-orange-600 rounded-xl mt-0.5 shrink-0">
+                                <div className="bg-orange-50/50 dark:bg-orange-950/10 border border-orange-100/50 dark:border-[#22222e]/40 p-4 rounded-2xl flex items-start gap-3 text-sm text-left">
+                                    <div className="p-2 bg-orange-100 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400 rounded-xl mt-0.5 shrink-0">
                                         <Clock className="w-4 h-4" />
                                     </div>
                                     <div>
-                                        <h4 className="font-extrabold text-orange-950">Estimated Preparation & Transit</h4>
-                                        <p className="text-xs text-orange-800/80 leading-relaxed mt-0.5">
-                                            Delicious dishes are estimated to reach your dining table within **25 - 35 minutes**. Feel free to refresh this tracker to watch kitchen progress in real-time.
+                                        <h4 className="font-extrabold text-orange-950 dark:text-orange-200">{t.successEtaTitle}</h4>
+                                        <p className="text-xs text-orange-850/80 dark:text-orange-400/80 leading-relaxed mt-0.5">
+                                            {t.successEtaDesc}
                                         </p>
                                     </div>
                                 </div>
@@ -329,38 +383,38 @@ export default function OrderSuccessPage() {
                 {/* Right Column: Receipt Breakdown & Delivery Details */}
                 <div className="lg:col-span-5 space-y-6">
                     {/* Delivery Address Receipt Card */}
-                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4 text-left">
-                        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 border-b pb-3 border-gray-50">
+                    <div className="bg-white dark:bg-[#121216]/90 p-6 rounded-3xl border border-gray-100 dark:border-[#22222e] shadow-sm space-y-4 text-left">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2 border-b pb-3 border-gray-50 dark:border-[#22222e]/40">
                             <MapPin className="w-5 h-5 text-orange-500" />
-                            Delivery Details
+                            {t.successDeliveryDetails}
                         </h3>
                         
                         <div className="space-y-3.5 text-sm font-medium">
                             <div className="flex flex-col gap-0.5">
-                                <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">Recipient Name</span>
-                                <span className="text-gray-800">{orderMeta?.fullName || "Guest Customer"}</span>
+                                <span className="text-xs text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider">{t.successRecipient}</span>
+                                <span className="text-gray-800 dark:text-gray-200">{orderMeta?.fullName || (lang === 'ar' ? "عميل زائر" : "Guest Customer")}</span>
                             </div>
 
                             <div className="flex flex-col gap-0.5">
-                                <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">Delivery Destination</span>
-                                <span className="text-gray-800 text-xs">
-                                    {orderMeta?.address ? `${orderMeta.address}, ${orderMeta.city}` : "Stored securely on checkout device"}
+                                <span className="text-xs text-gray-400 dark:text-gray-550 font-bold uppercase tracking-wider">{t.successDestination}</span>
+                                <span className="text-gray-800 dark:text-gray-200 text-xs">
+                                    {orderMeta?.address ? `${orderMeta.address}, ${orderMeta.city}` : t.successStoredSecurely}
                                 </span>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="flex flex-col gap-0.5">
-                                    <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">Phone Line</span>
-                                    <span className="text-gray-850 text-gray-700 flex items-center gap-1.5 text-xs italic">
+                                    <span className="text-xs text-gray-400 dark:text-gray-550 font-bold uppercase tracking-wider">{t.successPhone}</span>
+                                    <span className="text-gray-850 text-gray-700 dark:text-gray-300 flex items-center gap-1.5 text-xs italic">
                                         <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                                        {orderMeta?.phoneNumber || "Stored locally"}
+                                        {orderMeta?.phoneNumber || t.successStoredLocally}
                                     </span>
                                 </div>
                                 <div className="flex flex-col gap-0.5">
-                                    <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">Payment</span>
-                                    <span className="text-gray-850 text-gray-700 flex items-center gap-1.5 uppercase font-semibold text-xs italic">
+                                    <span className="text-xs text-gray-400 dark:text-gray-550 font-bold uppercase tracking-wider">{t.successPayment}</span>
+                                    <span className="text-gray-850 text-gray-700 dark:text-gray-300 flex items-center gap-1.5 uppercase font-semibold text-xs italic">
                                         <CreditCard className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                                        {orderMeta?.paymentMethod || "Stored locally"}
+                                        {orderMeta?.paymentMethod ? (orderMeta.paymentMethod === 'card' ? t.checkoutPaymentCard : t.checkoutPaymentCod) : t.successStoredLocally}
                                     </span>
                                 </div>
                             </div>
@@ -368,14 +422,14 @@ export default function OrderSuccessPage() {
                     </div>
 
                     {/* Receipt Items Details */}
-                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4 text-left">
+                    <div className="bg-white dark:bg-[#121216]/90 p-6 rounded-3xl border border-gray-100 dark:border-[#22222e] shadow-sm space-y-4 text-left">
                         <button 
                             onClick={() => setIsReceiptOpen(!isReceiptOpen)}
-                            className="w-full flex items-center justify-between font-bold text-gray-900 border-b pb-3 border-gray-50 cursor-pointer"
+                            className="w-full flex items-center justify-between font-bold text-gray-900 dark:text-gray-100 border-b pb-3 border-gray-50 dark:border-[#22222e]/40 cursor-pointer"
                         >
                             <span className="flex items-center gap-2">
                                 <Receipt className="w-5 h-5 text-orange-500" />
-                                Itemized Receipt
+                                {t.successReceiptTitle}
                             </span>
                             {isReceiptOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                         </button>
@@ -383,34 +437,62 @@ export default function OrderSuccessPage() {
                         {isReceiptOpen && (
                             <div className="space-y-4">
                                 {/* Items list */}
-                                <div className="divide-y divide-gray-50 max-h-48 overflow-y-auto pr-1">
+                                <div className="divide-y divide-gray-50 dark:divide-[#22222e]/30 max-h-48 overflow-y-auto pr-1">
                                     {orderMeta?.items && orderMeta.items.length > 0 ? (
                                         orderMeta.items.map((item, idx) => (
-                                            <div key={idx} className="flex justify-between items-center py-2.5 first:pt-0 last:pb-0">
-                                                <div className="space-y-0.5">
-                                                    <span className="font-semibold text-sm text-gray-900">{item.name}</span>
-                                                    <p className="text-xs text-gray-400">Qty: {item.quantity} @ ${item.price.toFixed(2)}</p>
+                                            <div key={idx} className="flex justify-between items-start py-2.5 first:pt-0 last:pb-0 gap-4">
+                                                <div className="space-y-0.5 text-left">
+                                                    <span className="font-semibold text-sm text-gray-900 dark:text-gray-100 block">{translateMenu(item.name, lang)}</span>
+                                                    {item.customization && (
+                                                        <div className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold space-y-0.5 mt-0.5 pl-1.5 border-l border-orange-500/30 text-left">
+                                                            {item.customization.size && (
+                                                                <p className="leading-tight">
+                                                                    {lang === 'ar' ? "الحجم:" : "Portion:"} <span className="text-gray-600 dark:text-gray-300 font-bold">{translateAddon(item.customization.size, lang)}</span>
+                                                                </p>
+                                                            )}
+                                                            {(item.customization.addons && item.customization.addons.length > 0) && (
+                                                                <p className="leading-tight">
+                                                                    {lang === 'ar' ? "الإضافات:" : "Toppings:"} <span className="text-orange-500 dark:text-orange-450">{item.customization.addons.map(add => translateAddon(add, lang)).join(", ")}</span>
+                                                                </p>
+                                                            )}
+                                                            {item.customization.instructions && (
+                                                                <p className="italic text-gray-400 dark:text-gray-550 font-normal leading-tight">
+                                                                    {lang === 'ar' ? "ملاحظة:" : "Note:"} &quot;{item.customization.instructions}&quot;
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    <p className="text-xs text-gray-400 dark:text-gray-505">
+                                                        {lang === 'ar' ? "الكمية:" : "Qty:"} {item.quantity} @ ${item.price.toFixed(2)}
+                                                    </p>
                                                 </div>
-                                                <span className="font-bold text-sm text-gray-900">${(item.price * item.quantity).toFixed(2)}</span>
+                                                <span className="font-bold text-sm text-gray-900 dark:text-gray-200 shrink-0">${(item.price * item.quantity).toFixed(2)}</span>
                                             </div>
                                         ))
                                     ) : dbOrderItems && dbOrderItems.length > 0 ? (
                                         dbOrderItems.map((item, idx) => (
                                             <div key={idx} className="flex justify-between items-center py-2.5 first:pt-0 last:pb-0">
-                                                <div className="space-y-0.5">
-                                                    <span className="font-semibold text-sm text-gray-900">{item.products?.name || "Deleted Dish"}</span>
-                                                    <p className="text-xs text-gray-400">Qty: {item.quantity} @ ${item.price_at_time.toFixed(2)}</p>
+                                                <div className="space-y-0.5 text-left">
+                                                    <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">{item.products ? translateMenu(item.products.name, lang) : (lang === 'ar' ? "طبق محذوف" : "Deleted Dish")}</span>
+                                                    <p className="text-xs text-gray-400 dark:text-gray-505">
+                                                        {lang === 'ar' ? "الكمية:" : "Qty:"} {item.quantity} @ ${item.price_at_time.toFixed(2)}
+                                                    </p>
                                                 </div>
-                                                <span className="font-bold text-sm text-gray-900">${(item.price_at_time * item.quantity).toFixed(2)}</span>
+                                                <span className="font-bold text-sm text-gray-900 dark:text-gray-200">${(item.price_at_time * item.quantity).toFixed(2)}</span>
                                             </div>
                                         ))
                                     ) : (
                                         <div className="py-6 px-4 text-center space-y-3">
                                             <ShoppingBag className="w-8 h-8 text-gray-300 mx-auto" />
                                             <div className="space-y-1">
-                                                <p className="text-sm font-extrabold text-gray-800">Receipt Details Unavailable</p>
-                                                <p className="text-xs text-gray-400 max-w-sm mx-auto leading-relaxed">
-                                                    This order was placed on another device/session, or your local browser metadata has been cleared.
+                                                <p className="text-sm font-extrabold text-gray-800 dark:text-gray-100">
+                                                    {t.successReceiptUnavailable}
+                                                </p>
+                                                <p className="text-xs text-gray-400 dark:text-gray-500 max-w-sm mx-auto leading-relaxed">
+                                                    {lang === 'ar'
+                                                        ? "تم إجراء هذا الطلب من جهاز/جلسة أخرى، أو تم مسح ذاكرة التخزين المحلية لمتصفحك."
+                                                        : "This order was placed on another device/session, or your local browser metadata has been cleared."
+                                                    }
                                                 </p>
                                             </div>
                                         </div>
@@ -418,27 +500,27 @@ export default function OrderSuccessPage() {
                                 </div>
 
                                 {/* Calculation details */}
-                                <div className="border-t border-gray-50 pt-3 space-y-2 text-sm">
-                                    <div className="flex justify-between text-gray-500 font-medium">
-                                        <span>Subtotal</span>
+                                <div className="border-t border-gray-50 dark:border-[#22222e]/45 pt-3 space-y-2 text-sm">
+                                    <div className="flex justify-between text-gray-500 dark:text-gray-400 font-medium">
+                                        <span>{t.cartSubtotal}</span>
                                         <span>${subtotal.toFixed(2)}</span>
                                     </div>
                                     {discount > 0 && (
-                                        <div className="flex justify-between text-green-600 font-bold">
-                                            <span>Promo Discount</span>
+                                        <div className="flex justify-between text-green-600 dark:text-green-400 font-bold">
+                                            <span>{lang === 'ar' ? "خصم الكود" : "Promo Discount"}</span>
                                             <span>-${discount.toFixed(2)}</span>
                                         </div>
                                     )}
-                                    <div className="flex justify-between text-gray-500 font-medium">
-                                        <span>Delivery & Package Fee</span>
+                                    <div className="flex justify-between text-gray-500 dark:text-gray-400 font-medium">
+                                        <span>{lang === 'ar' ? "رسوم التوصيل والتعبئة" : "Delivery & Package Fee"}</span>
                                         <span>$3.99</span>
                                     </div>
-                                    <div className="flex justify-between text-gray-500 font-medium">
-                                        <span>Tax & Service (8%)</span>
+                                    <div className="flex justify-between text-gray-500 dark:text-gray-400 font-medium">
+                                        <span>{t.cartTax}</span>
                                         <span>${(subtotal * 0.08).toFixed(2)}</span>
                                     </div>
-                                    <div className="flex justify-between border-t border-gray-50 pt-3 text-base font-extrabold text-gray-900">
-                                        <span>Total Paid</span>
+                                    <div className="flex justify-between border-t border-gray-50 dark:border-[#22222e]/45 pt-3 text-base font-extrabold text-gray-900 dark:text-gray-100">
+                                        <span>{t.successTotalPaid}</span>
                                         <span>${finalTotal.toFixed(2)}</span>
                                     </div>
                                 </div>
