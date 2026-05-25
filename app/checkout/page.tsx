@@ -165,12 +165,15 @@ export default function CheckoutPage() {
             const orderId = orderData[0].id;
 
             // 2. Insert order items
-            const orderItemsInsert = items.map((item) => ({
-                order_id: orderId,
-                product_id: item.id,
-                quantity: item.quantity,
-                price_at_time: item.price
-            }));
+            const orderItemsInsert = items.map((item) => {
+                const prodId = item.customization?.productId || item.id.substring(0, 36);
+                return {
+                    order_id: orderId,
+                    product_id: prodId,
+                    quantity: item.quantity,
+                    price_at_time: item.price
+                };
+            });
 
             const { error: itemsError } = await supabase
                 .from("order_items")

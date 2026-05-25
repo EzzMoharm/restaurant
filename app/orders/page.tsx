@@ -9,7 +9,7 @@ import { useCartStore } from "@/store/cart";
 import toast from "react-hot-toast";
 import { 
     ShoppingBag, Calendar, ChevronDown, ChevronUp, 
-    Sparkles, ArrowRight, CheckCircle2, Utensils, Truck, RefreshCw, MapPin
+    Sparkles, ArrowRight, CheckCircle2, Utensils, Truck, RefreshCw, MapPin, Trash2
 } from "lucide-react";
 
 interface ProductData {
@@ -64,9 +64,40 @@ export default function CustomerOrdersPage() {
     const [isLoadingOrders, setIsLoadingOrders] = useState(false);
     const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
     const [isReorderingMap, setIsReorderingMap] = useState<Record<string, boolean>>({});
+    const [isDeletingMap, setIsDeletingMap] = useState<Record<string, boolean>>({});
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
     const addItem = useCartStore((state) => state.addItem);
     const openCart = useCartStore((state) => state.openCart);
+
+    async function handleDeleteOrder(orderId: string) {
+        setIsDeletingMap(prev => ({ ...prev, [orderId]: true }));
+
+        try {
+            // Deleting order will cascade delete order_items if configured,
+            // but we can delete from orders directly.
+            const { error } = await supabase
+                .from("orders")
+                .delete()
+                .eq("id", orderId);
+
+            if (error) {
+                toast.error("Failed to delete order: " + error.message);
+            } else {
+                toast.success("Order removed from history.", {
+                    style: { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
+                });
+                setOrders(prev => prev.filter(o => o.id !== orderId));
+                localStorage.removeItem(`biteflow-order-meta-${orderId}`);
+            }
+        } catch (err) {
+            console.error("Delete order error:", err);
+            toast.error("An unexpected error occurred while deleting the order.");
+        } finally {
+            setIsDeletingMap(prev => ({ ...prev, [orderId]: false }));
+            setConfirmDeleteId(null);
+        }
+    }
 
     useEffect(() => {
         async function verifyAuth() {
@@ -411,7 +442,7 @@ export default function CustomerOrdersPage() {
                                                                 }
                                                             }
 
-                                                            if (metaData && metaData.items) {
+                                                            if (metaData && metaData.items && metaData.items.length > 0) {
                                                                 return metaData.items.map((metaItem: MetaItem, idx: number) => (
                                                                     <div key={idx} className="flex justify-between items-start py-2.5 first:pt-0 last:pb-0 gap-4">
                                                                         <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -444,25 +475,46 @@ export default function CustomerOrdersPage() {
                                                                 ));
                                                             }
 
-                                                            return order.order_items.map((item, idx) => (
-                                                                <div key={idx} className="flex justify-between items-center py-2.5 first:pt-0 last:pb-0 gap-4">
-                                                                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                                        {item.products?.image_url && (
-                                                                            // eslint-disable-next-line @next/next/no-img-element
-                                                                            <img 
-                                                                                src={item.products.image_url} 
-                                                                                alt={item.products.name}
-                                                                                className="w-10 h-10 object-cover rounded-lg border border-gray-100 bg-gray-50 shrink-0"
-                                                                            />
-                                                                        )}
-                                                                        <div className="space-y-0.5 min-w-0">
-                                                                            <span className="font-semibold text-sm text-gray-900 block truncate">{item.products?.name || "Deleted Dish"}</span>
-                                                                            <p className="text-xs text-gray-400 mt-0.5">Qty: {item.quantity} @ ${item.price_at_time.toFixed(2)}</p>
+                                                            if (order.order_items && order.order_items.length > 0) {
+                                                                return order.order_items.map((item, idx) => (
+                                                                    <div key={idx} className="flex justify-between items-center py-2.5 first:pt-0 last:pb-0 gap-4">
+                                                                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                                            {item.products?.image_url && (
+                                                                                // eslint-disable-next-line @next/next/no-img-element
+                                                                                <img 
+                                                                                    src={item.products.image_url} 
+                                                                                    alt={item.products.name}
+                                                                                    className="w-10 h-10 object-cover rounded-lg border border-gray-100 bg-gray-50 shrink-0"
+                                                                                />
+                                                                            )}
+                                                                            <div className="space-y-0.5 min-w-0">
+                                                                                <span className="font-semibold text-sm text-gray-900 block truncate">{item.products?.name || "Deleted Dish"}</span>
+                                                                                <p className="text-xs text-gray-400 mt-0.5">Qty: {item.quantity} @ ${item.price_at_time.toFixed(2)}</p>
+                                                                            </div>
                                                                         </div>
+                                                                        <span className="font-bold text-sm text-gray-800 shrink-0">${(item.price_at_time * item.quantity).toFixed(2)}</span>
                                                                     </div>
-                                                                    <span className="font-bold text-sm text-gray-800 shrink-0">${(item.price_at_time * item.quantity).toFixed(2)}</span>
+                                                                ));
+                                                            }
+
+                                                            return (
+                                                                <div className="py-6 px-4 text-center space-y-3">
+                                                                    <div className="p-3 bg-orange-50 text-orange-500 rounded-full inline-block">
+                                                                        <ShoppingBag className="w-6 h-6" />
+                                                                    </div>
+                                                                    <div className="space-y-1">
+                                                                        <p className="text-sm font-extrabold text-gray-850 text-gray-800">Receipt Details Unavailable</p>
+                                                                        <p className="text-xs text-gray-400 max-w-sm mx-auto leading-relaxed">
+                                                                            This order was placed on another device/session, or your local browser metadata has been cleared.
+                                                                        </p>
+                                                                    </div>
+                                                                    <div className="pt-2">
+                                                                        <span className="inline-flex items-center gap-1 bg-orange-50 border border-orange-100 text-orange-600 px-3 py-1.5 rounded-xl text-xs font-bold">
+                                                                            Total Paid: ${order.total_price.toFixed(2)}
+                                                                        </span>
+                                                                    </div>
                                                                 </div>
-                                                            ));
+                                                            );
                                                         })()}
                                                     </div>
                                                 </div>
@@ -494,6 +546,24 @@ export default function CustomerOrdersPage() {
                                                         View Order Summary
                                                         <ArrowRight className="w-3.5 h-3.5" />
                                                     </Link>
+
+                                                    <button
+                                                        onClick={() => setConfirmDeleteId(order.id)}
+                                                        disabled={isDeletingMap[order.id]}
+                                                        className="bg-red-50 hover:bg-red-100 text-red-600 font-bold py-2.5 px-6 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs border border-red-200/50 disabled:opacity-50"
+                                                    >
+                                                        {isDeletingMap[order.id] ? (
+                                                            <>
+                                                                <div className="w-3.5 h-3.5 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                                                                Removing...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                                Remove Order
+                                                            </>
+                                                        )}
+                                                    </button>
                                                 </div>
                                             </div>
                                         )}
@@ -503,6 +573,49 @@ export default function CustomerOrdersPage() {
                         </div>
                     </div>
 
+                </div>
+            )}
+
+            {/* Premium Confirm Deletion Modal */}
+            {confirmDeleteId && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[100] p-4 animate-fadeIn">
+                    <div className="bg-white rounded-3xl max-w-sm w-full p-6 border border-gray-100 shadow-2xl relative space-y-6 text-center animate-scaleUp">
+                        {/* Red warning icon */}
+                        <div className="mx-auto w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center ring-4 ring-red-50/50">
+                            <Trash2 className="w-8 h-8" />
+                        </div>
+
+                        {/* Title and Description */}
+                        <div className="space-y-2">
+                            <h3 className="text-lg font-extrabold text-gray-900 leading-tight">Remove Transaction History?</h3>
+                            <p className="text-xs text-gray-500 max-w-xs mx-auto leading-relaxed">
+                                This will permanently remove order <span className="font-extrabold text-gray-700">BF-{confirmDeleteId.substring(0, 5).toUpperCase()}</span> from your dashboard records. This action cannot be undone.
+                            </p>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                onClick={() => setConfirmDeleteId(null)}
+                                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3.5 px-4 rounded-xl transition-all cursor-pointer text-xs uppercase tracking-wide border border-gray-200/50"
+                            >
+                                Keep Order
+                            </button>
+                            <button
+                                onClick={() => handleDeleteOrder(confirmDeleteId)}
+                                className="flex-1 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md shadow-red-500/10 cursor-pointer text-xs uppercase tracking-wide flex items-center justify-center gap-1.5"
+                            >
+                                {isDeletingMap[confirmDeleteId] ? (
+                                    <>
+                                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        Removing...
+                                    </>
+                                ) : (
+                                    "Remove"
+                                )}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

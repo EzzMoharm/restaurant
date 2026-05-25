@@ -5,10 +5,23 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { 
     CheckCircle2, Clock, MapPin, ArrowRight, Sparkles, 
-    Utensils, Truck, Check, Receipt, RefreshCw, XCircle, ChevronDown, ChevronUp, Phone, CreditCard
+    Utensils, Truck, Check, Receipt, RefreshCw, XCircle, ChevronDown, ChevronUp, Phone, CreditCard, ShoppingBag
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
+
+interface ProductData {
+    name: string;
+    image_url: string;
+}
+
+interface OrderItem {
+    id: string;
+    quantity: number;
+    price_at_time: number;
+    product_id: string;
+    products: ProductData | null;
+}
 
 interface OrderMeta {
     fullName: string;
@@ -32,6 +45,7 @@ export default function OrderSuccessPage() {
     const [orderStatus, setOrderStatus] = useState<string>("pending");
     const [totalPrice, setTotalPrice] = useState<number>(0);
     const [orderMeta, setOrderMeta] = useState<OrderMeta | null>(null);
+    const [dbOrderItems, setDbOrderItems] = useState<OrderItem[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [isReceiptOpen, setIsReceiptOpen] = useState<boolean>(true);
 
@@ -54,16 +68,34 @@ export default function OrderSuccessPage() {
         // 1. Initial fetch from database and localStorage
         async function fetchOrderDetails() {
             try {
-                // Fetch from Supabase
+                // Fetch from Supabase with order items relation
                 const { data, error } = await supabase
                     .from("orders")
-                    .select("*")
+                    .select(`
+                        id,
+                        total_price,
+                        status,
+                        created_at,
+                        order_items (
+                            id,
+                            quantity,
+                            price_at_time,
+                            product_id,
+                            products (
+                                name,
+                                image_url
+                            )
+                        )
+                    `)
                     .eq("id", orderId)
                     .single();
 
                 if (!error && data) {
                     setOrderStatus(data.status);
                     setTotalPrice(data.total_price);
+                    if (data.order_items) {
+                        setDbOrderItems(data.order_items);
+                    }
                 }
 
                 // Fetch from LocalStorage
@@ -155,7 +187,9 @@ export default function OrderSuccessPage() {
 
     // Subtotals Calculations
     const finalTotal = orderMeta?.grandTotal || totalPrice || 0.00;
-    const subtotal = orderMeta?.items.reduce((sum, item) => sum + (item.price * item.quantity), 0) || (finalTotal > 3.99 ? finalTotal - 3.99 : finalTotal);
+    const subtotal = orderMeta?.items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+        || dbOrderItems.reduce((sum, item) => sum + (item.price_at_time * item.quantity), 0)
+        || (finalTotal > 3.99 ? finalTotal - 3.99 : finalTotal);
     const discount = orderMeta?.discountAmount || 0.00;
 
     return (
@@ -309,22 +343,24 @@ export default function OrderSuccessPage() {
 
                             <div className="flex flex-col gap-0.5">
                                 <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">Delivery Destination</span>
-                                <span className="text-gray-800">{orderMeta?.address ? `${orderMeta.address}, ${orderMeta.city}` : "123 Main Street, Spring City"}</span>
+                                <span className="text-gray-800 text-xs">
+                                    {orderMeta?.address ? `${orderMeta.address}, ${orderMeta.city}` : "Stored securely on checkout device"}
+                                </span>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="flex flex-col gap-0.5">
                                     <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">Phone Line</span>
-                                    <span className="text-gray-800 flex items-center gap-1.5">
-                                        <Phone className="w-3.5 h-3.5 text-gray-400" />
-                                        {orderMeta?.phoneNumber || "+1 (555) 019-2834"}
+                                    <span className="text-gray-850 text-gray-700 flex items-center gap-1.5 text-xs italic">
+                                        <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                        {orderMeta?.phoneNumber || "Stored locally"}
                                     </span>
                                 </div>
                                 <div className="flex flex-col gap-0.5">
                                     <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">Payment</span>
-                                    <span className="text-gray-800 flex items-center gap-1.5 uppercase font-semibold">
-                                        <CreditCard className="w-3.5 h-3.5 text-gray-400" />
-                                        {orderMeta?.paymentMethod || "cod"}
+                                    <span className="text-gray-850 text-gray-700 flex items-center gap-1.5 uppercase font-semibold text-xs italic">
+                                        <CreditCard className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                        {orderMeta?.paymentMethod || "Stored locally"}
                                     </span>
                                 </div>
                             </div>
@@ -348,7 +384,7 @@ export default function OrderSuccessPage() {
                             <div className="space-y-4">
                                 {/* Items list */}
                                 <div className="divide-y divide-gray-50 max-h-48 overflow-y-auto pr-1">
-                                    {orderMeta?.items ? (
+                                    {orderMeta?.items && orderMeta.items.length > 0 ? (
                                         orderMeta.items.map((item, idx) => (
                                             <div key={idx} className="flex justify-between items-center py-2.5 first:pt-0 last:pb-0">
                                                 <div className="space-y-0.5">
@@ -358,13 +394,25 @@ export default function OrderSuccessPage() {
                                                 <span className="font-bold text-sm text-gray-900">${(item.price * item.quantity).toFixed(2)}</span>
                                             </div>
                                         ))
-                                    ) : (
-                                        <div className="flex justify-between items-center py-2.5">
-                                            <div className="space-y-0.5">
-                                                <span className="font-semibold text-sm text-gray-900">Delicious Menu Item</span>
-                                                <p className="text-xs text-gray-400">Qty: 1 @ ${subtotal.toFixed(2)}</p>
+                                    ) : dbOrderItems && dbOrderItems.length > 0 ? (
+                                        dbOrderItems.map((item, idx) => (
+                                            <div key={idx} className="flex justify-between items-center py-2.5 first:pt-0 last:pb-0">
+                                                <div className="space-y-0.5">
+                                                    <span className="font-semibold text-sm text-gray-900">{item.products?.name || "Deleted Dish"}</span>
+                                                    <p className="text-xs text-gray-400">Qty: {item.quantity} @ ${item.price_at_time.toFixed(2)}</p>
+                                                </div>
+                                                <span className="font-bold text-sm text-gray-900">${(item.price_at_time * item.quantity).toFixed(2)}</span>
                                             </div>
-                                            <span className="font-bold text-sm text-gray-900">${subtotal.toFixed(2)}</span>
+                                        ))
+                                    ) : (
+                                        <div className="py-6 px-4 text-center space-y-3">
+                                            <ShoppingBag className="w-8 h-8 text-gray-300 mx-auto" />
+                                            <div className="space-y-1">
+                                                <p className="text-sm font-extrabold text-gray-800">Receipt Details Unavailable</p>
+                                                <p className="text-xs text-gray-400 max-w-sm mx-auto leading-relaxed">
+                                                    This order was placed on another device/session, or your local browser metadata has been cleared.
+                                                </p>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
