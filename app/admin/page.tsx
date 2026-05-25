@@ -10,6 +10,7 @@ import { ShieldX, LogOut, ArrowLeft, PlusCircle, LayoutDashboard, Layers, Shoppi
 import toast from "react-hot-toast";
 import { useTranslation, translateMenu } from "@/lib/translations";
 import { useSettingsStore } from "@/store/settings";
+import { sanitizeText, sanitizeCode, sanitizeDecimal, sanitizeInteger, sanitizeUrl } from "@/lib/security";
 
 interface Category {
     id: string;
@@ -193,6 +194,8 @@ export default function AdminPage() {
     const [isAddingCategory, setIsAddingCategory] = useState(false);
     const [isAddingProduct, setIsAddingProduct] = useState(false);
     const [isDeletingProduct, setIsDeletingProduct] = useState<string | null>(null);
+    const [isDeletingCoupon, setIsDeletingCoupon] = useState<string | null>(null);
+    const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<{ id: string; name: string; type: 'product' | 'coupon' } | null>(null);
     const [manageActiveCategory, setManageActiveCategory] = useState<string>("all");
 
     const [categoryErrors, setCategoryErrors] = useState<Record<string, string>>({});
@@ -420,12 +423,7 @@ export default function AdminPage() {
 
     async function handleDeleteProduct(id: string) {
         const isDark = useSettingsStore.getState().theme === "dark";
-        const confirmMsg = lang === 'ar'
-            ? "هل أنت متأكد أنك تريد حذف هذه الوجبة؟"
-            : "Are you sure you want to delete this product?";
         
-        if (!confirm(confirmMsg)) return;
-
         setIsDeletingProduct(id);
 
         const { error } = await supabase
@@ -434,6 +432,7 @@ export default function AdminPage() {
             .eq("id", id);
 
         setIsDeletingProduct(null);
+        setDeleteConfirmTarget(null);
 
         if (error) {
             toast.error(
@@ -499,20 +498,33 @@ export default function AdminPage() {
     }
 
     async function handleAddCoupon() {
-        if (!couponCode.trim() || !couponValue.trim()) {
-            toast.error(lang === 'ar' ? "يرجى ملء حقل الكود والقيمة." : "Please fill in the code and value fields.");
+        const isDark = useSettingsStore.getState().theme === "dark";
+        const cleanCode = sanitizeCode(couponCode);
+        const cleanValue = sanitizeDecimal(couponValue);
+        const cleanMinOrder = sanitizeDecimal(couponMinOrder);
+        const cleanMaxUses = sanitizeInteger(couponMaxUses);
+
+        if (!cleanCode || !cleanValue) {
+            toast.error(
+                lang === 'ar' ? "يرجى ملء حقل الكود والقيمة." : "Please fill in the code and value fields.",
+                {
+                    style: isDark
+                        ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                        : { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
+                }
+            );
             return;
         }
 
         setIsAddingCoupon(true);
 
         const insertData: Record<string, unknown> = {
-            code: couponCode.trim().toUpperCase(),
+            code: cleanCode,
             discount_type: couponType,
-            discount_value: parseFloat(couponValue),
+            discount_value: parseFloat(cleanValue),
             is_active: true,
-            min_order_amount: couponMinOrder ? parseFloat(couponMinOrder) : 0,
-            max_uses: couponMaxUses ? parseInt(couponMaxUses) : null,
+            min_order_amount: cleanMinOrder ? parseFloat(cleanMinOrder) : 0,
+            max_uses: cleanMaxUses ? parseInt(cleanMaxUses) : null,
             expiry_date: couponExpiry || null,
         };
 
@@ -520,12 +532,22 @@ export default function AdminPage() {
 
         if (error) {
             toast.error(
-                (lang === 'ar' ? "خطأ في إنشاء الكوبون: " : "Error creating coupon: ") + error.message
+                (lang === 'ar' ? "خطأ في إنشاء الكوبون: " : "Error creating coupon: ") + error.message,
+                {
+                    style: isDark
+                        ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                        : { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
+                }
             );
         } else {
-            toast.success(lang === 'ar' ? "تم إنشاء الكوبون بنجاح!" : "Coupon created successfully!", {
-                style: { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
-            });
+            toast.success(
+                lang === 'ar' ? "تم إنشاء الكوبون بنجاح!" : "Coupon created successfully!",
+                {
+                    style: isDark
+                        ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                        : { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
+                }
+            );
             setCouponCode("");
             setCouponValue("");
             setCouponExpiry("");
@@ -538,37 +560,59 @@ export default function AdminPage() {
     }
 
     async function handleToggleCoupon(couponId: string, currentActive: boolean) {
+        const isDark = useSettingsStore.getState().theme === "dark";
         const { error } = await supabase
             .from("coupons")
             .update({ is_active: !currentActive })
             .eq("id", couponId);
 
         if (error) {
-            toast.error((lang === 'ar' ? "خطأ في تحديث الكوبون: " : "Error updating coupon: ") + error.message);
+            toast.error(
+                (lang === 'ar' ? "خطأ في تحديث الكوبون: " : "Error updating coupon: ") + error.message,
+                {
+                    style: isDark
+                        ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                        : { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
+                }
+            );
         } else {
             setCoupons(prev => prev.map(c => c.id === couponId ? { ...c, is_active: !currentActive } : c));
         }
     }
 
     async function handleDeleteCoupon(couponId: string) {
-        const confirmMsg = lang === 'ar' ? "هل أنت متأكد من حذف هذا الكوبون؟" : "Are you sure you want to delete this coupon?";
-        if (!confirm(confirmMsg)) return;
-
+        const isDark = useSettingsStore.getState().theme === "dark";
+        setIsDeletingCoupon(couponId);
         const { error } = await supabase.from("coupons").delete().eq("id", couponId);
+        setIsDeletingCoupon(null);
+        setDeleteConfirmTarget(null);
         if (error) {
-            toast.error((lang === 'ar' ? "خطأ في حذف الكوبون: " : "Error deleting coupon: ") + error.message);
+            toast.error(
+                (lang === 'ar' ? "خطأ في حذف الكوبون: " : "Error deleting coupon: ") + error.message,
+                {
+                    style: isDark
+                        ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                        : { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
+                }
+            );
         } else {
             setCoupons(prev => prev.filter(c => c.id !== couponId));
-            toast.success(lang === 'ar' ? "تم حذف الكوبون." : "Coupon deleted.", {
-                style: { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
-            });
+            toast.success(
+                lang === 'ar' ? "تم حذف الكوبون." : "Coupon deleted.",
+                {
+                    style: isDark
+                        ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                        : { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
+                }
+            );
         }
     }
 
     async function handleAddCategory() {
         const isDark = useSettingsStore.getState().theme === "dark";
         setCategoryErrors({});
-        if (!categoryName.trim()) {
+        const cleanName = sanitizeText(categoryName);
+        if (!cleanName) {
             setCategoryErrors({ categoryName: lang === 'ar' ? "يرجى إدخال اسم القسم." : "Please enter a category name." });
             toast.error(
                 lang === 'ar' ? "يرجى ملء حقول الأقسام المطلوبة." : "Please fill out all category fields.",
@@ -583,10 +627,10 @@ export default function AdminPage() {
 
         setIsAddingCategory(true);
 
-        const slug = categoryName.toLowerCase().replace(/ /g, "-");
+        const slug = cleanName.toLowerCase().replace(/ /g, "-").replace(/[^a-z0-9-]/g, "");
         const { error } = await supabase
             .from("categories")
-            .insert([{ name: categoryName, slug }]);
+            .insert([{ name: cleanName, slug }]);
 
         setIsAddingCategory(false);
 
@@ -618,15 +662,19 @@ export default function AdminPage() {
         setProductErrors({});
         const newErrors: Record<string, string> = {};
 
-        if (!productName.trim()) {
+        const cleanName = sanitizeText(productName);
+        const cleanPrice = sanitizeDecimal(price);
+        const cleanImageUrl = sanitizeUrl(imageUrl.trim());
+
+        if (!cleanName) {
             newErrors.productName = lang === 'ar' ? "يرجى إدخال اسم الوجبة." : "Please enter a product name.";
         }
-        if (!price.trim()) {
+        if (!cleanPrice) {
             newErrors.price = lang === 'ar' ? "يرجى إدخال السعر." : "Please enter a price.";
-        } else if (isNaN(parseFloat(price)) || parseFloat(price) <= 0) {
+        } else if (isNaN(parseFloat(cleanPrice)) || parseFloat(cleanPrice) <= 0) {
             newErrors.price = lang === 'ar' ? "يرجى إدخال سعر صالح أكبر من 0." : "Please enter a valid price greater than 0.";
         }
-        if (imageUrl.trim() && !/^https?:\/\/.+/.test(imageUrl.trim())) {
+        if (cleanImageUrl && !/^https?:\/\/.+/.test(cleanImageUrl)) {
             newErrors.imageUrl = lang === 'ar' ? "يرجى إدخال رابط صورة صالح." : "Please enter a valid image URL (e.g. http:// or https://).";
         }
         if (!selectedCategory) {
@@ -648,12 +696,12 @@ export default function AdminPage() {
 
         setIsAddingProduct(true);
 
-        const finalImageUrl = imageUrl.trim() || "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=500";
+        const finalImageUrl = cleanImageUrl || "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=500";
 
         const { error } = await supabase.from("products").insert([
             {
-                name: productName.trim(),
-                price: parseFloat(price),
+                name: cleanName,
+                price: parseFloat(cleanPrice),
                 category_id: selectedCategory,
                 image_url: finalImageUrl,
             },
@@ -1004,7 +1052,7 @@ export default function AdminPage() {
                             }`}
                             value={price}
                             onChange={(e) => {
-                                setPrice(e.target.value);
+                                setPrice(sanitizeDecimal(e.target.value));
                                 if (productErrors.price) setProductErrors(prev => ({ ...prev, price: "" }));
                             }}
                         />
@@ -1177,7 +1225,7 @@ export default function AdminPage() {
                                     </span>
                                     <span className="font-bold text-sm text-green-600 dark:text-green-400">${prod.price.toFixed(2)}</span>
                                     <button
-                                        onClick={() => handleDeleteProduct(prod.id)}
+                                        onClick={() => setDeleteConfirmTarget({ id: prod.id, name: prod.name, type: 'product' })}
                                         disabled={isDeletingProduct === prod.id}
                                         className="p-2 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 rounded-xl transition-all cursor-pointer disabled:opacity-50 border border-red-100/50 dark:border-red-900/40 hover:border-red-200"
                                         title={t.adminBtnDelete}
@@ -1459,7 +1507,7 @@ export default function AdminPage() {
                             type="text"
                             placeholder="e.g. SUMMER20"
                             value={couponCode}
-                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                            onChange={(e) => setCouponCode(sanitizeCode(e.target.value))}
                             className="w-full border border-gray-200 dark:border-[#22222e] p-2.5 rounded-xl text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 bg-gray-50/50 dark:bg-[#161622]/50 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-bold uppercase tracking-wider"
                         />
                     </div>
@@ -1477,11 +1525,11 @@ export default function AdminPage() {
                     <div className="space-y-1">
                         <label className="text-xs font-bold text-gray-500 dark:text-gray-400">{t.adminCouponValue}</label>
                         <input
-                            type="number"
+                            type="text"
                             placeholder={couponType === 'percentage' ? "e.g. 15" : "e.g. 5.00"}
                             value={couponValue}
-                            onChange={(e) => setCouponValue(e.target.value)}
-                            className="w-full border border-gray-200 dark:border-[#22222e] p-2.5 rounded-xl text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 bg-gray-50/50 dark:bg-[#161622]/50 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium"
+                            onChange={(e) => setCouponValue(sanitizeDecimal(e.target.value))}
+                            className="w-full border border-gray-200 dark:border-[#22222e] p-2.5 rounded-xl text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-550 bg-gray-50/50 dark:bg-[#161622]/50 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium"
                         />
                     </div>
                     <div className="space-y-1">
@@ -1496,11 +1544,11 @@ export default function AdminPage() {
                     <div className="space-y-1">
                         <label className="text-xs font-bold text-gray-500 dark:text-gray-400">{t.adminCouponMinOrder}</label>
                         <input
-                            type="number"
+                            type="text"
                             placeholder="0.00"
                             value={couponMinOrder}
-                            onChange={(e) => setCouponMinOrder(e.target.value)}
-                            className="w-full border border-gray-200 dark:border-[#22222e] p-2.5 rounded-xl text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 bg-gray-50/50 dark:bg-[#161622]/50 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium"
+                            onChange={(e) => setCouponMinOrder(sanitizeDecimal(e.target.value))}
+                            className="w-full border border-gray-200 dark:border-[#22222e] p-2.5 rounded-xl text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-550 bg-gray-50/50 dark:bg-[#161622]/50 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium"
                         />
                     </div>
                     <div className="space-y-1">
@@ -1575,10 +1623,15 @@ export default function AdminPage() {
                                             }`} />
                                         </button>
                                         <button
-                                            onClick={() => handleDeleteCoupon(coupon.id)}
+                                            onClick={() => setDeleteConfirmTarget({ id: coupon.id, name: coupon.code, type: 'coupon' })}
                                             className="p-1.5 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-950/40 text-red-500 dark:text-red-400 rounded-lg transition-all cursor-pointer"
+                                            disabled={isDeletingCoupon === coupon.id}
                                         >
-                                            <Trash2 className="w-3.5 h-3.5" />
+                                            {isDeletingCoupon === coupon.id ? (
+                                                <div className="w-3.5 h-3.5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                                            ) : (
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            )}
                                         </button>
                                     </div>
                                 </div>
@@ -1587,6 +1640,82 @@ export default function AdminPage() {
                     </div>
                 )}
             </section>
+
+            {/* Premium Custom Delete Confirmation Modal */}
+            {deleteConfirmTarget && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[100] p-4 animate-fadeIn">
+                    <div className="bg-white dark:bg-[#121216] rounded-3xl max-w-sm w-full p-6 border border-gray-100 dark:border-[#22222e] shadow-2xl relative space-y-6 text-center animate-scaleUp">
+                        {/* Red warning icon */}
+                        <div className="mx-auto w-16 h-16 bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400 rounded-full flex items-center justify-center ring-4 ring-red-50/50 dark:ring-red-950/20">
+                            <Trash2 className="w-8 h-8" />
+                        </div>
+
+                        {/* Title and Description */}
+                        <div className="space-y-2">
+                            <h3 className="text-lg font-extrabold text-gray-900 dark:text-gray-100 leading-tight">
+                                {deleteConfirmTarget.type === 'product' ? (
+                                    lang === 'ar' ? "حذف هذه الوجبة؟" : "Delete this product?"
+                                ) : (
+                                    lang === 'ar' ? "حذف هذا الكوبون؟" : "Delete this coupon?"
+                                )}
+                            </h3>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 max-w-xs mx-auto leading-relaxed">
+                                {deleteConfirmTarget.type === 'product' ? (
+                                    lang === 'ar' ? (
+                                        <>سيؤدي هذا إلى حذف الوجبة <span className="font-extrabold text-gray-700 dark:text-gray-300">{deleteConfirmTarget.name}</span> نهائياً من قائمتك. لا يمكن التراجع عن هذا الإجراء.</>
+                                    ) : (
+                                        <>This will permanently remove the product <span className="font-extrabold text-gray-700 dark:text-gray-300">{deleteConfirmTarget.name}</span> from your menu. This action cannot be undone.</>
+                                    )
+                                ) : (
+                                    lang === 'ar' ? (
+                                        <>سيؤدي هذا إلى حذف الكوبون <span className="font-extrabold text-gray-700 dark:text-gray-300">{deleteConfirmTarget.name}</span> نهائياً. لن يتمكن العملاء من استخدامه بعد الآن.</>
+                                    ) : (
+                                        <>This will permanently delete the coupon <span className="font-extrabold text-gray-700 dark:text-gray-300">{deleteConfirmTarget.name}</span>. Customers will no longer be able to use it.</>
+                                    )
+                                )}
+                            </p>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                onClick={() => setDeleteConfirmTarget(null)}
+                                className="flex-1 bg-gray-100 dark:bg-[#1a1a24] hover:bg-gray-200 dark:hover:bg-[#232333] text-gray-700 dark:text-gray-300 font-bold py-3.5 px-4 rounded-xl transition-all cursor-pointer text-xs uppercase tracking-wide border border-gray-200/50 dark:border-[#22222e]/80"
+                            >
+                                {deleteConfirmTarget.type === 'product' ? (
+                                    lang === 'ar' ? "إلغاء" : "Keep Product"
+                                ) : (
+                                    lang === 'ar' ? "إلغاء" : "Keep Coupon"
+                                )}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (deleteConfirmTarget.type === 'product') {
+                                        handleDeleteProduct(deleteConfirmTarget.id);
+                                    } else {
+                                        handleDeleteCoupon(deleteConfirmTarget.id);
+                                    }
+                                }}
+                                className="flex-1 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md shadow-red-500/10 cursor-pointer text-xs uppercase tracking-wide flex items-center justify-center gap-1.5"
+                                disabled={
+                                    deleteConfirmTarget.type === 'product' 
+                                        ? isDeletingProduct === deleteConfirmTarget.id
+                                        : isDeletingCoupon === deleteConfirmTarget.id
+                                }
+                            >
+                                {(deleteConfirmTarget.type === 'product' ? isDeletingProduct === deleteConfirmTarget.id : isDeletingCoupon === deleteConfirmTarget.id) ? (
+                                    <>
+                                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        {lang === 'ar' ? "جاري الحذف..." : "Removing..."}
+                                    </>
+                                ) : (
+                                    lang === 'ar' ? "حذف" : "Delete"
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -10,6 +10,7 @@ import Link from "next/link";
 import { Eye, EyeOff, Lock, Mail, ArrowLeft, LogIn, AlertCircle } from "lucide-react";
 import { useTranslation } from "@/lib/translations";
 import { useSettingsStore } from "@/store/settings";
+import { sanitizeEmail } from "@/lib/security";
 
 export default function LoginPage() {
     const router = useRouter();
@@ -26,13 +27,10 @@ export default function LoginPage() {
     // Redirect to home or admin panel if already logged in
     useEffect(() => {
         async function checkCurrentSession() {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                if (isUserAdmin(user)) {
-                    router.push("/admin");
-                } else {
-                    router.push("/");
-                }
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                const isAdmin = isUserAdmin(session.user);
+                router.push(isAdmin ? "/admin" : "/");
             } else {
                 setIsCheckingSession(false);
             }
@@ -44,8 +42,9 @@ export default function LoginPage() {
         e.preventDefault();
         setErrors({});
 
+        const cleanEmail = sanitizeEmail(email);
         const newErrors: Record<string, string> = {};
-        if (!email.trim()) {
+        if (!cleanEmail) {
             newErrors.email = lang === 'ar' ? "يرجى إدخال بريدك الإلكتروني." : "Please enter your email.";
         } else if (!/\S+@\S+\.\S+/.test(email)) {
             newErrors.email = lang === 'ar' ? "يرجى إدخال بريد إلكتروني صالح." : "Please enter a valid email address.";
@@ -74,7 +73,7 @@ export default function LoginPage() {
 
         try {
             const { data, error } = await supabase.auth.signInWithPassword({
-                email,
+                email: cleanEmail,
                 password,
             });
 

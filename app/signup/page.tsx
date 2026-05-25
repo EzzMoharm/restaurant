@@ -10,6 +10,7 @@ import Link from "next/link";
 import { Eye, EyeOff, Lock, Mail, ArrowLeft, UserPlus, User as UserIcon, AlertCircle } from "lucide-react";
 import { useTranslation } from "@/lib/translations";
 import { useSettingsStore } from "@/store/settings";
+import { sanitizeText, sanitizeEmail } from "@/lib/security";
 
 export default function SignupPage() {
     const router = useRouter();
@@ -46,14 +47,17 @@ export default function SignupPage() {
         e.preventDefault();
         setErrors({});
         
+        const cleanUsername = sanitizeText(username);
+        const cleanEmail = sanitizeEmail(email);
+
         const newErrors: Record<string, string> = {};
-        if (!username.trim()) {
+        if (!cleanUsername) {
             newErrors.username = lang === 'ar' ? "يرجى إدخال اسم المستخدم." : "Please enter a username.";
         }
         
-        if (!email.trim()) {
+        if (!cleanEmail) {
             newErrors.email = lang === 'ar' ? "يرجى إدخال بريدك الإلكتروني." : "Please enter your email.";
-        } else if (!/\S+@\S+\.\S+/.test(email)) {
+        } else if (!/\S+@\S+\.\S+/.test(cleanEmail)) {
             newErrors.email = lang === 'ar' ? "يرجى إدخال بريد إلكتروني صالح." : "Please enter a valid email address.";
         }
         
@@ -88,11 +92,11 @@ export default function SignupPage() {
 
         try {
             const { data, error } = await supabase.auth.signUp({
-                email,
+                email: cleanEmail,
                 password,
                 options: {
                     data: {
-                        username: username.trim(),
+                        username: cleanUsername,
                     }
                 }
             });

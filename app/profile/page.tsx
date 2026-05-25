@@ -4,6 +4,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
+import { sanitizeText, sanitizePhone } from "@/lib/security";
 import toast from "react-hot-toast";
 import { 
     User as UserIcon, Phone, MapPin, Mail, Sparkles, 
@@ -130,11 +131,16 @@ export default function CustomerProfilePage() {
         e.preventDefault();
         setErrors({});
 
+        const cleanUsername = sanitizeText(username);
+        const cleanAddress = sanitizeText(address);
+        const cleanCity = sanitizeText(city);
+        const cleanPhoneNumber = sanitizePhone(phoneNumber);
+
         const newErrors: Record<string, string> = {};
-        if (!username.trim()) {
+        if (!cleanUsername) {
             newErrors.username = lang === 'ar' ? "اسم العرض لا يمكن أن يكون فارغاً." : "Display name cannot be empty.";
         }
-        if (phoneNumber.trim() && phoneNumber.length < 7) {
+        if (cleanPhoneNumber && cleanPhoneNumber.length < 7) {
             newErrors.phoneNumber = lang === 'ar' ? "رقم الهاتف يجب أن يتكون من 7 أرقام على الأقل." : "Phone number must be at least 7 digits.";
         }
 
@@ -150,7 +156,7 @@ export default function CustomerProfilePage() {
         try {
             // 1. Update Supabase Auth metadata for real-time navbar updates
             const { error: authError } = await supabase.auth.updateUser({
-                data: { username: username.trim() }
+                data: { username: cleanUsername }
             });
 
             if (authError) {
@@ -161,10 +167,10 @@ export default function CustomerProfilePage() {
             localStorage.setItem(
                 `biteflow-profile-meta-${userId}`,
                 JSON.stringify({
-                    username: username.trim(),
-                    address: address.trim(),
-                    city: city.trim(),
-                    phoneNumber: phoneNumber.trim(),
+                    username: cleanUsername,
+                    address: cleanAddress,
+                    city: cleanCity,
+                    phoneNumber: cleanPhoneNumber,
                     avatarUrl: avatarUrl
                 })
             );
@@ -412,7 +418,7 @@ export default function CustomerProfilePage() {
                                     placeholder={lang === 'ar' ? "مثال: 0555019283" : "e.g. 555-019-2834"}
                                     value={phoneNumber}
                                     onChange={(e) => {
-                                        setPhoneNumber(e.target.value);
+                                        setPhoneNumber(sanitizePhone(e.target.value));
                                         if (errors.phoneNumber) setErrors(prev => ({ ...prev, phoneNumber: "" }));
                                     }}
                                     className={`w-full border p-3.5 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 bg-gray-50/50 dark:bg-[#161622]/50 focus:bg-white dark:focus:bg-[#121216] focus:outline-none focus:ring-2 transition-all font-medium text-start ${

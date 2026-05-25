@@ -10,6 +10,7 @@ import Link from "next/link";
 import { Eye, EyeOff, Lock, Mail, ShieldAlert, ArrowLeft, AlertCircle } from "lucide-react";
 import { useTranslation } from "@/lib/translations";
 import { useSettingsStore } from "@/store/settings";
+import { sanitizeEmail } from "@/lib/security";
 
 export default function AdminLoginPage() {
     const router = useRouter();
@@ -40,8 +41,9 @@ export default function AdminLoginPage() {
         e.preventDefault();
         setErrors({});
 
+        const cleanEmail = sanitizeEmail(email);
         const newErrors: Record<string, string> = {};
-        if (!email.trim()) {
+        if (!cleanEmail) {
             newErrors.email = lang === 'ar' ? "يرجى إدخال بريدك الإلكتروني." : "Please enter your email.";
         } else if (!/\S+@\S+\.\S+/.test(email)) {
             newErrors.email = lang === 'ar' ? "يرجى إدخال بريد إلكتروني صالح." : "Please enter a valid email address.";
@@ -70,7 +72,7 @@ export default function AdminLoginPage() {
 
         try {
             const { data, error } = await supabase.auth.signInWithPassword({
-                email,
+                email: cleanEmail,
                 password,
             });
 

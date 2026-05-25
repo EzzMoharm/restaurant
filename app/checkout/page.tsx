@@ -4,6 +4,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/store/cart";
+import { sanitizeText, sanitizeCode, sanitizePhone } from "@/lib/security";
 import { supabase } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import Link from "next/link";
@@ -103,7 +104,7 @@ export default function CheckoutPage() {
     // Apply Promo Code (Database-backed - Feature 4)
     async function handleApplyPromo(e: React.FormEvent) {
         e.preventDefault();
-        const code = promoCode.trim().toUpperCase();
+        const code = sanitizeCode(promoCode);
         
         if (appliedPromo) {
             return toast.error(lang === 'ar' ? "تم تطبيق كود الخصم بالفعل." : "A promo code has already been applied.");
@@ -177,11 +178,16 @@ export default function CheckoutPage() {
         e.preventDefault();
         setErrors({});
 
+        const cleanFullName = sanitizeText(fullName);
+        const cleanAddress = sanitizeText(address);
+        const cleanCity = sanitizeText(city);
+        const cleanPhoneNumber = sanitizePhone(phoneNumber);
+
         const newErrors: Record<string, string> = {};
-        if (!fullName.trim()) newErrors.fullName = lang === 'ar' ? "يرجى إدخال اسمك الكامل." : "Please enter your name.";
-        if (!address.trim()) newErrors.address = lang === 'ar' ? "يرجى إدخال عنوان الشارع." : "Please enter your street address.";
-        if (!city.trim()) newErrors.city = lang === 'ar' ? "يرجى إدخال المدينة." : "Please enter your city.";
-        if (!phoneNumber.trim()) newErrors.phoneNumber = lang === 'ar' ? "يرجى إدخال رقم هاتفك." : "Please enter your phone number.";
+        if (!cleanFullName) newErrors.fullName = lang === 'ar' ? "يرجى إدخال اسمك الكامل." : "Please enter your name.";
+        if (!cleanAddress) newErrors.address = lang === 'ar' ? "يرجى إدخال عنوان الشارع." : "Please enter your street address.";
+        if (!cleanCity) newErrors.city = lang === 'ar' ? "يرجى إدخال المدينة." : "Please enter your city.";
+        if (!cleanPhoneNumber) newErrors.phoneNumber = lang === 'ar' ? "يرجى إدخال رقم هاتفك." : "Please enter your phone number.";
 
         if (paymentMethod === "card") {
             const cleanCard = cardNumber.replace(/\s/g, "");
@@ -262,10 +268,10 @@ export default function CheckoutPage() {
             localStorage.setItem(
                 `biteflow-order-meta-${orderId}`,
                 JSON.stringify({
-                    fullName,
-                    address,
-                    city,
-                    phoneNumber,
+                    fullName: cleanFullName,
+                    address: cleanAddress,
+                    city: cleanCity,
+                    phoneNumber: cleanPhoneNumber,
                     paymentMethod,
                     items: items.map((item) => ({
                         id: item.id,
@@ -482,7 +488,7 @@ export default function CheckoutPage() {
                                     placeholder={lang === 'ar' ? "رقم هاتفك" : "Your phone number"}
                                     value={phoneNumber}
                                     onChange={(e) => {
-                                        setPhoneNumber(e.target.value);
+                                        setPhoneNumber(sanitizePhone(e.target.value));
                                         if (errors.phoneNumber) setErrors(prev => ({ ...prev, phoneNumber: "" }));
                                     }}
                                     className={`w-full border p-3 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 bg-gray-50/50 dark:bg-[#161622]/50 focus:bg-white dark:focus:bg-[#121216] focus:outline-none focus:ring-2 transition-all font-medium text-start ${
@@ -703,7 +709,7 @@ export default function CheckoutPage() {
                                     type="text"
                                     placeholder={t.checkoutPromoPlaceholder}
                                     value={promoCode}
-                                    onChange={(e) => setPromoCode(e.target.value)}
+                                    onChange={(e) => setPromoCode(sanitizeCode(e.target.value))}
                                     disabled={!!appliedPromo}
                                     className={`block w-full ${lang === 'ar' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2 border border-gray-200 dark:border-[#22222e] rounded-xl text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 bg-gray-50/50 dark:bg-[#161622]/50 focus:bg-white dark:focus:bg-[#121216] focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium disabled:opacity-50`}
                                 />
