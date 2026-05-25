@@ -17,6 +17,29 @@ interface ProductData {
     image_url: string;
 }
 
+interface MetaCustomization {
+    size?: string;
+    addons?: string[];
+    instructions?: string;
+}
+
+interface MetaItem {
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+    customization?: MetaCustomization;
+}
+
+interface OrderDeliveryMeta {
+    fullName: string;
+    address: string;
+    city: string;
+    phoneNumber: string;
+    paymentMethod: string;
+    items?: MetaItem[];
+}
+
 interface OrderItem {
     id: string;
     quantity: number;
@@ -119,20 +142,36 @@ export default function CustomerOrdersPage() {
             await new Promise(resolve => setTimeout(resolve, 600));
 
             let addedCount = 0;
-            order.order_items.forEach((item) => {
-                if (item.products) {
+            const metaStr = localStorage.getItem(`biteflow-order-meta-${order.id}`);
+            const metaData: OrderDeliveryMeta | null = metaStr ? JSON.parse(metaStr) : null;
+
+            if (metaData && metaData.items) {
+                metaData.items.forEach((metaItem: MetaItem) => {
                     addItem({
-                        id: item.product_id,
-                        name: item.products.name,
-                        price: item.price_at_time,
-                        quantity: item.quantity
+                        id: metaItem.id,
+                        name: metaItem.name,
+                        price: metaItem.price,
+                        quantity: metaItem.quantity,
+                        customization: metaItem.customization
                     });
                     addedCount++;
-                }
-            });
+                });
+            } else {
+                order.order_items.forEach((item) => {
+                    if (item.products) {
+                        addItem({
+                            id: item.product_id,
+                            name: item.products.name,
+                            price: item.price_at_time,
+                            quantity: item.quantity
+                        });
+                        addedCount++;
+                    }
+                });
+            }
 
             if (addedCount > 0) {
-                toast.success(`Added ${addedCount} item(s) back to your cart!`, {
+                toast.success(`Added ${addedCount} customized item(s) back to your cart!`, {
                     style: { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
                 });
                 openCart();
@@ -362,26 +401,69 @@ export default function CustomerOrdersPage() {
                                                 {/* Items summary */}
                                                 <div className="space-y-2.5 text-left">
                                                     <h5 className="text-xs font-bold text-gray-400 uppercase tracking-widest pl-0.5">Ordered Receipts</h5>
-                                                    <div className="bg-white rounded-2xl border border-gray-100 p-4 divide-y divide-gray-50 shadow-sm max-w-2xl">
-                                                        {order.order_items.map((item, idx) => (
-                                                            <div key={idx} className="flex justify-between items-center py-2.5 first:pt-0 last:pb-0">
-                                                                <div className="flex items-center gap-3">
-                                                                    {item.products?.image_url && (
-                                                                        // eslint-disable-next-line @next/next/no-img-element
-                                                                        <img 
-                                                                            src={item.products.image_url} 
-                                                                            alt={item.products.name}
-                                                                            className="w-10 h-10 object-cover rounded-lg border border-gray-100 bg-gray-50"
-                                                                        />
-                                                                    )}
-                                                                    <div className="space-y-0.5">
-                                                                        <span className="font-semibold text-sm text-gray-900">{item.products?.name || "Deleted Dish"}</span>
-                                                                        <p className="text-xs text-gray-400">Qty: {item.quantity} @ ${item.price_at_time.toFixed(2)}</p>
+                                                    <div className="bg-white rounded-2xl border border-gray-100 p-4 divide-y divide-gray-50 shadow-sm max-w-2xl text-left">
+                                                        {(() => {
+                                                            let metaData: OrderDeliveryMeta | null = null;
+                                                            if (typeof window !== "undefined") {
+                                                                const metaStr = localStorage.getItem(`biteflow-order-meta-${order.id}`);
+                                                                if (metaStr) {
+                                                                    metaData = JSON.parse(metaStr);
+                                                                }
+                                                            }
+
+                                                            if (metaData && metaData.items) {
+                                                                return metaData.items.map((metaItem: MetaItem, idx: number) => (
+                                                                    <div key={idx} className="flex justify-between items-start py-2.5 first:pt-0 last:pb-0 gap-4">
+                                                                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                                                                            <div className="space-y-0.5 min-w-0">
+                                                                                <span className="font-semibold text-sm text-gray-900 block truncate">{metaItem.name}</span>
+                                                                                {metaItem.customization && (
+                                                                                    <div className="text-[10px] text-gray-400 font-semibold space-y-0.5 mt-0.5 pl-1.5 border-l border-orange-500/30 text-left">
+                                                                                        {metaItem.customization.size && (
+                                                                                            <p className="leading-tight">
+                                                                                                Portion: <span className="text-gray-600 font-bold">{metaItem.customization.size}</span>
+                                                                                            </p>
+                                                                                        )}
+                                                                                        {(metaItem.customization.addons && metaItem.customization.addons.length > 0) && (
+                                                                                            <p className="leading-tight">
+                                                                                                Toppings: <span className="text-orange-500">{metaItem.customization.addons.join(", ")}</span>
+                                                                                            </p>
+                                                                                        )}
+                                                                                        {metaItem.customization.instructions && (
+                                                                                            <p className="italic text-gray-400 font-normal leading-tight">
+                                                                                                Note: &quot;{metaItem.customization.instructions}&quot;
+                                                                                            </p>
+                                                                                        )}
+                                                                                    </div>
+                                                                                )}
+                                                                                <p className="text-xs text-gray-400 mt-0.5">Qty: {metaItem.quantity} @ ${metaItem.price.toFixed(2)}</p>
+                                                                            </div>
+                                                                        </div>
+                                                                        <span className="font-bold text-sm text-gray-800 shrink-0">${(metaItem.price * metaItem.quantity).toFixed(2)}</span>
                                                                     </div>
+                                                                ));
+                                                            }
+
+                                                            return order.order_items.map((item, idx) => (
+                                                                <div key={idx} className="flex justify-between items-center py-2.5 first:pt-0 last:pb-0 gap-4">
+                                                                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                                        {item.products?.image_url && (
+                                                                            // eslint-disable-next-line @next/next/no-img-element
+                                                                            <img 
+                                                                                src={item.products.image_url} 
+                                                                                alt={item.products.name}
+                                                                                className="w-10 h-10 object-cover rounded-lg border border-gray-100 bg-gray-50 shrink-0"
+                                                                            />
+                                                                        )}
+                                                                        <div className="space-y-0.5 min-w-0">
+                                                                            <span className="font-semibold text-sm text-gray-900 block truncate">{item.products?.name || "Deleted Dish"}</span>
+                                                                            <p className="text-xs text-gray-400 mt-0.5">Qty: {item.quantity} @ ${item.price_at_time.toFixed(2)}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <span className="font-bold text-sm text-gray-800 shrink-0">${(item.price_at_time * item.quantity).toFixed(2)}</span>
                                                                 </div>
-                                                                <span className="font-bold text-sm text-gray-800">${(item.price_at_time * item.quantity).toFixed(2)}</span>
-                                                            </div>
-                                                        ))}
+                                                            ));
+                                                        })()}
                                                     </div>
                                                 </div>
 

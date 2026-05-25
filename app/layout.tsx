@@ -3,6 +3,7 @@ import { Toaster } from "react-hot-toast";
 import "./globals.css";
 import Navbar from "@/components/shared/Navbar";
 import CartSheet from "@/components/shared/CartSheet";
+import CustomizationModal from "@/components/shared/CustomizationModal";
 // 1. Import the Toaster
 
 export const metadata: Metadata = {
@@ -26,6 +27,7 @@ export default function RootLayout({
         <div className="relative z-10 flex flex-col min-h-screen">
           <Navbar />
           <CartSheet />
+          <CustomizationModal />
 
           {/* 2. Add the Toaster component right here */}
           <Toaster position="bottom-right" reverseOrder={false} />

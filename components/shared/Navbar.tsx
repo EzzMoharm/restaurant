@@ -2,6 +2,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ShoppingCart, Menu as MenuIcon, X, LogOut, Shield } from "lucide-react";
 import { useCartStore } from "@/store/cart";
 import { useEffect, useState } from "react";
@@ -11,6 +12,7 @@ import { User } from "@supabase/supabase-js";
 import toast from "react-hot-toast";
 
 export default function Navbar() {
+    const router = useRouter();
     const totalItems = useCartStore((state) => state.totalItems());
     const openCart = useCartStore((state) => state.openCart);
 
@@ -20,10 +22,27 @@ export default function Navbar() {
     // Auth States
     const [user, setUser] = useState<User | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [avatarUrl, setAvatarUrl] = useState<string>("");
 
     useEffect(() => {
         //eslint-disable-next-line
         setIsMounted(true);
+
+        function loadCachedAvatar(userId: string) {
+            try {
+                const localMetaStr = localStorage.getItem(`biteflow-profile-meta-${userId}`);
+                if (localMetaStr) {
+                    const parsed = JSON.parse(localMetaStr);
+                    if (parsed.avatarUrl) {
+                        setAvatarUrl(parsed.avatarUrl);
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.error("Error loading cached avatar in navbar:", err);
+            }
+            setAvatarUrl("");
+        }
 
         // Fetch initial session state
         async function fetchInitialSession() {
@@ -31,6 +50,11 @@ export default function Navbar() {
             setUser(user);
             setIsAdmin(isUserAdmin(user));
             useCartStore.getState().setUserId(user?.id || null);
+            if (user) {
+                loadCachedAvatar(user.id);
+            } else {
+                setAvatarUrl("");
+            }
         }
         fetchInitialSession();
 
@@ -40,10 +64,28 @@ export default function Navbar() {
             setUser(currentUser);
             setIsAdmin(isUserAdmin(currentUser));
             useCartStore.getState().setUserId(currentUser?.id || null);
+            if (currentUser) {
+                loadCachedAvatar(currentUser.id);
+            } else {
+                setAvatarUrl("");
+            }
         });
+
+        // Listen for profile-update event (for dynamic real-time local cache update)
+        const handleProfileUpdate = () => {
+            supabase.auth.getUser().then(({ data: { user: updatedUser } }) => {
+                if (updatedUser) {
+                    setUser(updatedUser);
+                    loadCachedAvatar(updatedUser.id);
+                }
+            });
+        };
+
+        window.addEventListener("profile-update", handleProfileUpdate);
 
         return () => {
             subscription.unsubscribe();
+            window.removeEventListener("profile-update", handleProfileUpdate);
         };
     }, []);
 
@@ -56,6 +98,7 @@ export default function Navbar() {
                 style: { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
             });
             setIsMobileMenuOpen(false);
+            router.push("/");
         }
     }
 
@@ -108,8 +151,17 @@ export default function Navbar() {
                                 {user ? (
                                     <div className="flex items-center gap-3 bg-gray-50 pl-3 pr-2 py-1.5 rounded-xl border border-gray-100">
                                         <Link href="/profile" className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer" title="View Profile">
-                                            <div className="w-6 h-6 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-xs font-bold uppercase">
-                                                {(user.user_metadata?.username || user.email || "U").charAt(0)}
+                                            <div className="w-6 h-6 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-xs font-bold uppercase overflow-hidden">
+                                                {avatarUrl ? (
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    <img 
+                                                        src={avatarUrl} 
+                                                        alt="Profile Avatar"
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                ) : (
+                                                    (user.user_metadata?.username || user.email || "U").charAt(0)
+                                                )}
                                             </div>
                                             <span className="text-xs font-medium text-gray-600 max-w-[120px] truncate">
                                                 {user.user_metadata?.username || user.email}
@@ -200,8 +252,17 @@ export default function Navbar() {
                                         className="flex items-center gap-2 hover:opacity-85 transition-opacity cursor-pointer text-left"
                                         title="View Profile"
                                     >
-                                        <div className="w-8 h-8 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-sm font-bold uppercase">
-                                            {(user.user_metadata?.username || user.email || "U").charAt(0)}
+                                        <div className="w-8 h-8 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-sm font-bold uppercase overflow-hidden">
+                                            {avatarUrl ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img 
+                                                    src={avatarUrl} 
+                                                    alt="Profile Avatar"
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            ) : (
+                                                (user.user_metadata?.username || user.email || "U").charAt(0)
+                                            )}
                                         </div>
                                         <div className="flex flex-col truncate">
                                             <span className="text-xs font-semibold text-gray-400">Logged in as</span>

@@ -1,13 +1,13 @@
 // app/profile/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { 
     User as UserIcon, Phone, MapPin, Mail, Sparkles, 
-    ArrowLeft, Save, RefreshCw, LogOut, Shield
+    ArrowLeft, Save, RefreshCw, LogOut, Shield, Camera
 } from "lucide-react";
 import { isUserAdmin } from "@/lib/supabase/admin";
 
@@ -16,6 +16,7 @@ interface ProfileMeta {
     address: string;
     city: string;
     phoneNumber: string;
+    avatarUrl?: string;
 }
 
 export default function CustomerProfilePage() {
@@ -33,6 +34,9 @@ export default function CustomerProfilePage() {
     const [address, setAddress] = useState("");
     const [city, setCity] = useState("");
     const [phoneNumber, setPhoneNumber] = useState("");
+    const [avatarUrl, setAvatarUrl] = useState<string>("");
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
     
     // Error validations
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -65,6 +69,7 @@ export default function CustomerProfilePage() {
                     if (parsed.address) setAddress(parsed.address);
                     if (parsed.city) setCity(parsed.city);
                     if (parsed.phoneNumber) setPhoneNumber(parsed.phoneNumber);
+                    if (parsed.avatarUrl) setAvatarUrl(parsed.avatarUrl);
                 }
             } catch (err) {
                 console.error("Profile session load error:", err);
@@ -74,6 +79,38 @@ export default function CustomerProfilePage() {
         }
         fetchSession();
     }, [router]);
+
+    function triggerFileInput() {
+        fileInputRef.current?.click();
+    }
+
+    function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith("image/")) {
+            toast.error("Please select a valid image file.");
+            return;
+        }
+
+        if (file.size > 1.5 * 1024 * 1024) {
+            toast.error("Selected image is too large. Please select a photo under 1.5MB.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const dataUrl = event.target?.result as string;
+            setAvatarUrl(dataUrl);
+            toast.success("Profile picture loaded! Click Save to apply.", {
+                style: { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' }
+            });
+        };
+        reader.onerror = () => {
+            toast.error("Failed to read image file.");
+        };
+        reader.readAsDataURL(file);
+    }
 
     async function handleSaveChanges(e: React.FormEvent) {
         e.preventDefault();
@@ -111,9 +148,15 @@ export default function CustomerProfilePage() {
                     username: username.trim(),
                     address: address.trim(),
                     city: city.trim(),
-                    phoneNumber: phoneNumber.trim()
+                    phoneNumber: phoneNumber.trim(),
+                    avatarUrl: avatarUrl
                 })
             );
+
+            // Dispatch global event to notify layout headers of avatar change
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(new Event("profile-update"));
+            }
 
             toast.success("Profile details updated successfully!", {
                 style: {
@@ -188,15 +231,40 @@ export default function CustomerProfilePage() {
                 {/* Left Column: Avatar Widget & Shortcuts */}
                 <div className="lg:col-span-4 space-y-6">
                     <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm text-center space-y-5">
-                        <div className="relative inline-flex">
+                        <div 
+                            onClick={triggerFileInput}
+                            className="relative inline-flex group cursor-pointer"
+                            title="Click to upload profile photo"
+                        >
                             <div className="absolute inset-0 bg-orange-100 rounded-full blur-xl opacity-50 scale-125 animate-pulse"></div>
                             {/* Avatar Badge */}
-                            <div className="w-24 h-24 bg-gradient-to-br from-orange-500 to-red-500 text-white rounded-full flex items-center justify-center text-4xl font-black uppercase shadow-lg shadow-orange-500/20 border-4 border-white relative z-10">
-                                {avatarLetter}
+                            <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white relative z-10 shadow-lg shadow-orange-500/20 bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
+                                {avatarUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img 
+                                        src={avatarUrl} 
+                                        alt="Profile Avatar"
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <span className="text-white text-4xl font-black uppercase">{avatarLetter}</span>
+                                )}
+                                
+                                {/* Camera hover overlay */}
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
+                                    <Camera className="w-6 h-6 text-white" />
+                                </div>
                             </div>
                             <div className="absolute bottom-0 right-0 p-1.5 bg-orange-100 text-orange-600 rounded-full shadow-md z-20 border border-white">
                                 <Sparkles className="w-4 h-4" />
                             </div>
+                            <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                onChange={handleFileChange} 
+                                className="hidden" 
+                                accept="image/*" 
+                            />
                         </div>
 
                         <div className="space-y-1">

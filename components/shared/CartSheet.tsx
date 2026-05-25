@@ -2,8 +2,8 @@
 // components/shared/CartSheet.tsx
 "use client";
 
-import { useCartStore } from "@/store/cart";
-import { X, Trash2 } from "lucide-react";
+import { useCartStore, CartItem } from "@/store/cart";
+import { X, Trash2, Pencil } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
@@ -12,13 +12,18 @@ import Link from "next/link";
 
 export default function CartSheet() {
     const router = useRouter();
-    const { items, isOpen, closeCart, removeItem, cartTotal } = useCartStore();
+    const { items, isOpen, closeCart, removeItem, cartTotal, setEditingItem } = useCartStore();
     const [isMounted, setIsMounted] = useState(false);
 
     // Hydration fix
     useEffect(() => {
         setIsMounted(true);
     }, []);
+
+    function handleEditCartItem(item: CartItem) {
+        setEditingItem(item);
+        closeCart();
+    }
 
     async function handleCheckout() {
         try {
@@ -84,7 +89,26 @@ export default function CartSheet() {
                             <div key={item.id} className="flex justify-between items-center bg-gray-50 p-4 rounded-lg border border-gray-100">
                                 <div>
                                     <h3 className="font-semibold text-gray-900">{item.name}</h3>
-                                    <p className="text-sm text-gray-500">
+                                    {item.customization && (
+                                        <div className="text-[10px] text-gray-400 font-semibold mt-0.5 space-y-0.5 text-left pl-1.5 border-l border-orange-500/30">
+                                            {item.customization.size && (
+                                                <p className="leading-tight">
+                                                    Portion: <span className="text-gray-600 font-bold">{item.customization.size}</span>
+                                                </p>
+                                            )}
+                                            {(item.customization.addons && item.customization.addons.length > 0) && (
+                                                <p className="leading-tight">
+                                                    Toppings: <span className="text-orange-500">{item.customization.addons.join(", ")}</span>
+                                                </p>
+                                            )}
+                                            {item.customization.instructions && (
+                                                <p className="italic text-gray-400 font-normal leading-tight">
+                                                    Note: &quot;{item.customization.instructions}&quot;
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                    <p className="text-xs text-gray-500 mt-1">
                                         ${item.price.toFixed(2)} x {item.quantity}
                                     </p>
                                 </div>
@@ -93,8 +117,16 @@ export default function CartSheet() {
                                         ${(item.price * item.quantity).toFixed(2)}
                                     </span>
                                     <button
+                                        onClick={() => handleEditCartItem(item)}
+                                        className="text-orange-400 hover:text-orange-600 transition-colors cursor-pointer"
+                                        title="Edit Customization"
+                                    >
+                                        <Pencil className="w-4 h-4" />
+                                    </button>
+                                    <button
                                         onClick={() => removeItem(item.id)}
                                         className="text-red-400 hover:text-red-600 transition-colors cursor-pointer"
+                                        title="Remove Item"
                                     >
                                         <Trash2 className="w-4 h-4" />
                                     </button>

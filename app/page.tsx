@@ -31,7 +31,7 @@ export default function Home() {
   const [user, setUser] = useState<User | null>(null);
 
   // Bring in the Zustand cart action
-  const addItem = useCartStore((state) => state.addItem);
+  const setCustomizingProduct = useCartStore((state) => state.setCustomizingProduct);
 
   useEffect(() => {
     async function checkUserSession() {
@@ -148,24 +148,7 @@ export default function Home() {
                       return;
                     }
 
-                    addItem({
-                      id: product.id,
-                      name: product.name,
-                      price: product.price,
-                      quantity: 1
-                    });
-                    toast.success(`${product.name} added to cart!`, {
-                      style: {
-                        border: '1px solid #10B981',
-                        padding: '16px',
-                        color: '#047857',
-                        fontWeight: 'bold',
-                      },
-                      iconTheme: {
-                        primary: '#10B981',
-                        secondary: '#FFFAEE',
-                      },
-                    });
+                    setCustomizingProduct(product);
                   }}
                   className="w-full bg-orange-100 text-orange-600 hover:bg-orange-500 hover:text-white font-semibold py-2.5 rounded-xl transition-colors cursor-pointer"
                 >
@@ -176,7 +159,6 @@ export default function Home() {
           ))
         )}
       </div>
-
     </div>
   );
 }

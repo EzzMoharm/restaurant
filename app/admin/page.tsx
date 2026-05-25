@@ -44,12 +44,27 @@ interface AdminOrder {
     order_items: AdminOrderItem[];
 }
 
+interface MetaCustomization {
+    size?: string;
+    addons?: string[];
+    instructions?: string;
+}
+
+interface MetaItem {
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+    customization?: MetaCustomization;
+}
+
 interface OrderDeliveryMeta {
     fullName: string;
     address: string;
     city: string;
     phoneNumber: string;
     paymentMethod: string;
+    items?: MetaItem[];
 }
 import toast from "react-hot-toast";
 
@@ -774,14 +789,46 @@ export default function AdminPage() {
                                         <div className="space-y-1">
                                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-0.5">Items</span>
                                             <div className="bg-white rounded-xl border border-gray-100 p-3 divide-y divide-gray-50 space-y-1.5">
-                                                {order.order_items?.map((item, idx) => (
-                                                    <div key={idx} className="flex justify-between items-center py-1.5 first:pt-0 last:pb-0">
-                                                        <span className="font-medium text-gray-700">
-                                                            {item.products?.name || "Deleted Dish"} <span className="font-bold text-gray-500">x{item.quantity}</span>
-                                                        </span>
-                                                        <span className="font-bold text-gray-900">${(item.price_at_time * item.quantity).toFixed(2)}</span>
-                                                    </div>
-                                                ))}
+                                                {metaData && metaData.items ? (
+                                                    metaData.items.map((metaItem: MetaItem, idx: number) => (
+                                                        <div key={idx} className="py-2 first:pt-0 last:pb-0 text-left">
+                                                            <div className="flex justify-between items-start gap-4">
+                                                                <span className="font-semibold text-gray-800">
+                                                                    {metaItem.name} <span className="font-bold text-gray-500">x{metaItem.quantity}</span>
+                                                                </span>
+                                                                <span className="font-bold text-gray-900 shrink-0">${(metaItem.price * metaItem.quantity).toFixed(2)}</span>
+                                                            </div>
+                                                            {metaItem.customization && (
+                                                                <div className="text-[10px] text-gray-400 font-semibold space-y-0.5 mt-0.5 pl-1.5 border-l border-orange-500/30">
+                                                                    {metaItem.customization.size && (
+                                                                        <p className="leading-tight">
+                                                                            Portion: <span className="text-gray-600 font-bold">{metaItem.customization.size}</span>
+                                                                        </p>
+                                                                    )}
+                                                                    {(metaItem.customization.addons && metaItem.customization.addons.length > 0) && (
+                                                                        <p className="leading-tight">
+                                                                            Add-ons: <span className="text-orange-500">{metaItem.customization.addons.join(", ")}</span>
+                                                                        </p>
+                                                                    )}
+                                                                    {metaItem.customization.instructions && (
+                                                                        <p className="italic text-gray-400 font-normal leading-tight">
+                                                                            Note: &quot;{metaItem.customization.instructions}&quot;
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    order.order_items?.map((item, idx) => (
+                                                        <div key={idx} className="flex justify-between items-center py-1.5 first:pt-0 last:pb-0">
+                                                            <span className="font-medium text-gray-700">
+                                                                {item.products?.name || "Deleted Dish"} <span className="font-bold text-gray-500">x{item.quantity}</span>
+                                                            </span>
+                                                            <span className="font-bold text-gray-900">${(item.price_at_time * item.quantity).toFixed(2)}</span>
+                                                        </div>
+                                                    ))
+                                                )}
                                                 <div className="flex justify-between border-t border-gray-50 pt-2 font-extrabold text-orange-600 text-sm">
                                                     <span>Grand Total</span>
                                                     <span>${order.total_price.toFixed(2)}</span>

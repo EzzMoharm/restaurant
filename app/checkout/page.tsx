@@ -194,7 +194,8 @@ export default function CheckoutPage() {
                         id: item.id,
                         name: item.name,
                         price: item.price,
-                        quantity: item.quantity
+                        quantity: item.quantity,
+                        customization: item.customization
                     })),
                     discountAmount,
                     grandTotal,
@@ -558,12 +559,31 @@ export default function CheckoutPage() {
 
                         <div className="divide-y divide-gray-50 max-h-60 overflow-y-auto pr-1">
                             {items.map((item) => (
-                                <div key={item.id} className="flex justify-between items-center py-3 first:pt-0 last:pb-0">
-                                    <div className="space-y-0.5">
-                                        <h4 className="font-semibold text-sm text-gray-900">{item.name}</h4>
-                                        <p className="text-xs text-gray-500">Qty: {item.quantity} @ ${item.price.toFixed(2)}</p>
+                                <div key={item.id} className="flex justify-between items-start py-3 first:pt-0 last:pb-0 text-left gap-4">
+                                    <div className="space-y-0.5 flex-1 min-w-0">
+                                        <h4 className="font-semibold text-sm text-gray-900 truncate">{item.name}</h4>
+                                        {item.customization && (
+                                            <div className="text-[10px] text-gray-400 font-semibold space-y-0.5 mt-0.5 pl-1.5 border-l border-orange-500/30">
+                                                {item.customization.size && (
+                                                    <p className="leading-tight">
+                                                        Portion: <span className="text-gray-600 font-bold">{item.customization.size}</span>
+                                                    </p>
+                                                )}
+                                                {(item.customization.addons && item.customization.addons.length > 0) && (
+                                                    <p className="leading-tight">
+                                                        Toppings: <span className="text-orange-500">{item.customization.addons.join(", ")}</span>
+                                                    </p>
+                                                )}
+                                                {item.customization.instructions && (
+                                                    <p className="italic text-gray-400 font-normal leading-tight">
+                                                        Note: &quot;{item.customization.instructions}&quot;
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+                                        <p className="text-xs text-gray-500 mt-0.5">Qty: {item.quantity} @ ${item.price.toFixed(2)}</p>
                                     </div>
-                                    <span className="font-bold text-sm text-gray-900">${(item.price * item.quantity).toFixed(2)}</span>
+                                    <span className="font-bold text-sm text-gray-900 shrink-0">${(item.price * item.quantity).toFixed(2)}</span>
                                 </div>
                             ))}
                         </div>
