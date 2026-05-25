@@ -129,7 +129,24 @@ export default function OrderSuccessPage() {
                     setOrderStatus(data.status);
                     setTotalPrice(data.total_price);
                     if (data.order_items) {
-                        setDbOrderItems(data.order_items);
+                        const mappedItems = data.order_items.map((item: any) => {
+                            let productObj = null;
+                            if (item.products) {
+                                if (Array.isArray(item.products)) {
+                                    productObj = item.products[0] || null;
+                                } else {
+                                    productObj = item.products;
+                                }
+                            }
+                            return {
+                                id: item.id,
+                                quantity: item.quantity,
+                                price_at_time: item.price_at_time,
+                                product_id: item.product_id,
+                                products: productObj
+                            };
+                        });
+                        setDbOrderItems(mappedItems);
                     }
                 }
 
