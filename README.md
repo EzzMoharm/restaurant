@@ -25,6 +25,10 @@ BiteFlow is a full-featured, real-time, double-sided SaaS platform designed for 
 *   **Step-by-Step Security Checkout Flow**:
     *   Auto-fills saved shipping coordinates and mobile lines from profile data.
     *   Flexible payment supports: Credit/Debit Mock Verification gates and Cash on Delivery (COD) processing.
+*   **Bilingual Password Recovery Gate**:
+    *   Self-service password recovery flow utilizing Supabase Auth SMTP reset links.
+    *   Bespoke, secure `/reset-password` UI views with validations (minimum length checks and mismatch filters).
+    *   Integrated session checkpoint guards to block unauthorized access to the reset page.
 *   **Live Order Transit Tracker & Progress Monitor**:
     *   Visually tracks live chef approvals and kitchen preparation stages (*Received ➔ Cooking ➔ Quality Packed ➔ Out for Delivery ➔ Arrived Safely*).
     *   Calculates dynamic estimated time of arrival (ETA) indicators.
