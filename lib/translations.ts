@@ -224,6 +224,22 @@ export const translations = {
 
     // Feature 5: Quick Reorder
     ordersQuickReorder: "Quick Reorder",
+
+    // Password Reset Flows
+    authForgotLink: "Forgot Password?",
+    authForgotTitle: "Recover Password",
+    authForgotSubtitle: "Enter your email to receive a secure recovery link.",
+    authForgotBtn: "Send Recovery Link",
+    authForgotSending: "Sending Link...",
+    authForgotSuccess: "A recovery link has been sent to your email!",
+    authForgotBackLogin: "Back to Sign In",
+    resetTitle: "Set New Password",
+    resetSubtitle: "Choose a secure, strong password for your account.",
+    resetBtnUpdate: "Save New Password",
+    resetUpdating: "Saving...",
+    resetSuccess: "Password updated successfully!",
+    resetErrMismatch: "Passwords do not match.",
+    resetErrShort: "Password must be at least 6 characters.",
   },
   ar: {
     // Navbar
@@ -447,6 +463,22 @@ export const translations = {
 
     // Feature 5: Quick Reorder
     ordersQuickReorder: "إعادة طلب سريع",
+
+    // Password Reset Flows
+    authForgotLink: "هل نسيت كلمة المرور؟",
+    authForgotTitle: "استعادة كلمة المرور",
+    authForgotSubtitle: "أدخل بريدك الإلكتروني لتلقي رابط استعادة آمن.",
+    authForgotBtn: "إرسال رابط الاستعادة",
+    authForgotSending: "جاري إرسال الرابط...",
+    authForgotSuccess: "تم إرسال رابط الاستعادة إلى بريدك الإلكتروني!",
+    authForgotBackLogin: "العودة لتسجيل الدخول",
+    resetTitle: "تعيين كلمة مرور جديدة",
+    resetSubtitle: "اختر كلمة مرور قوية وآمنة لحسابك.",
+    resetBtnUpdate: "حفظ كلمة المرور الجديدة",
+    resetUpdating: "جاري الحفظ...",
+    resetSuccess: "تم تحديث كلمة المرور بنجاح!",
+    resetErrMismatch: "كلمتا المرور غير متطابقتين.",
+    resetErrShort: "يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.",
   }
 };
 

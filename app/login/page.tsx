@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase/client";
 import { isUserAdmin } from "@/lib/supabase/admin";
 import toast from "react-hot-toast";
 import Link from "next/link";
-import { Eye, EyeOff, Lock, Mail, ArrowLeft, LogIn, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, ArrowLeft, LogIn, AlertCircle, KeyRound } from "lucide-react";
 import { useTranslation } from "@/lib/translations";
 import { useSettingsStore } from "@/store/settings";
 import { sanitizeEmail } from "@/lib/security";
@@ -23,6 +23,9 @@ export default function LoginPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [isCheckingSession, setIsCheckingSession] = useState(true);
     const [errors, setErrors] = useState<Record<string, string>>({});
+
+    const [isForgotMode, setIsForgotMode] = useState(false);
+    const [forgotEmailSent, setForgotEmailSent] = useState(false);
 
     // Redirect to home or admin panel if already logged in
     useEffect(() => {
@@ -112,6 +115,70 @@ export default function LoginPage() {
         }
     }
 
+    async function handleForgotPassword(e: React.FormEvent) {
+        e.preventDefault();
+        setErrors({});
+
+        const cleanEmail = sanitizeEmail(email);
+        const newErrors: Record<string, string> = {};
+        if (!cleanEmail) {
+            newErrors.email = lang === 'ar' ? "يرجى إدخال بريدك الإلكتروني." : "Please enter your email.";
+        } else if (!/\S+@\S+\.\S+/.test(cleanEmail)) {
+            newErrors.email = lang === 'ar' ? "يرجى إدخال بريد إلكتروني صالح." : "Please enter a valid email address.";
+        }
+
+        const isDark = theme === "dark";
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
+            toast.error(
+                lang === 'ar' ? "يرجى إدخال بريد إلكتروني صالح." : "Please enter a valid email address.",
+                {
+                    style: isDark
+                        ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                        : { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
+                }
+            );
+            return;
+        }
+
+        setIsLoading(true);
+
+        try {
+            const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+                redirectTo: `${window.location.origin}/reset-password`,
+            });
+
+            if (error) throw error;
+
+            setForgotEmailSent(true);
+            toast.success(
+                t.authForgotSuccess,
+                {
+                    style: isDark
+                        ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                        : { border: '1px solid #10B981', padding: '16px', color: '#047857', fontWeight: 'bold' },
+                    iconTheme: {
+                        primary: '#10B981',
+                        secondary: '#FFFAEE',
+                    },
+                }
+            );
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error 
+                ? error.message 
+                : (lang === 'ar' ? "فشل إرسال رابط استعادة كلمة المرور." : "Failed to send password recovery link.");
+            
+            toast.error(errorMessage, {
+                style: isDark
+                    ? { border: '1px solid #22222e', padding: '16px', color: '#f3f4f6', backgroundColor: '#121216', fontWeight: 'bold' }
+                    : { border: '1px solid #EF4444', padding: '16px', color: '#B91C1C', fontWeight: 'bold' }
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
     if (isCheckingSession) {
         return (
             <div className="min-h-[80vh] flex flex-col justify-center items-center space-y-4">
@@ -122,14 +189,14 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-h-[85vh] flex items-center justify-center px-4 py-12 bg-gradient-to-br from-orange-55 via-white to-gray-55 dark:from-[#0d0d11] dark:via-[#121216] dark:to-[#0f0f13] relative overflow-hidden">
+        <div className="min-h-[85vh] flex items-center justify-center px-4 py-12 bg-gradient-to-br from-orange-50 via-white to-gray-50 dark:from-[#0d0d11] dark:via-[#121216] dark:to-[#0f0f13] relative overflow-hidden">
             {/* Ambient glows */}
             <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-orange-100/40 dark:bg-orange-950/10 rounded-full blur-3xl opacity-60 pointer-events-none"></div>
             <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-96 h-96 bg-red-50/40 dark:bg-red-950/10 rounded-full blur-3xl opacity-60 pointer-events-none"></div>
 
             <div className="max-w-md w-full space-y-8 relative z-10">
                 {/* Back Link */}
-                <Link href="/" className="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-orange-500 transition-colors group font-semibold text-start">
+                <Link href="/" className="inline-flex items-center gap-2 text-sm text-gray-505 dark:text-gray-400 hover:text-orange-500 transition-colors group font-semibold text-start">
                     <ArrowLeft className={`w-4 h-4 transform ${lang === 'ar' ? 'rotate-180 group-hover:translate-x-1' : 'group-hover:-translate-x-1'} transition-transform`} />
                     {t.authBackMenu}
                 </Link>
@@ -138,108 +205,208 @@ export default function LoginPage() {
                     {/* Header */}
                     <div className="text-center space-y-2">
                         <div className="inline-flex p-3 bg-orange-100 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 rounded-2xl mb-2">
-                            <LogIn className="w-6 h-6" />
+                            {isForgotMode ? <KeyRound className="w-6 h-6" /> : <LogIn className="w-6 h-6" />}
                         </div>
                         <h2 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">
-                            {t.authSignInTitle}
+                            {isForgotMode ? t.authForgotTitle : t.authSignInTitle}
                         </h2>
                         <p className="text-gray-500 dark:text-gray-400 text-sm">
-                            {t.authSignInSubtitle}
+                            {isForgotMode ? t.authForgotSubtitle : t.authSignInSubtitle}
                         </p>
                     </div>
 
-                    {/* Form */}
-                    <form onSubmit={handleLogin} noValidate className="space-y-5 text-start">
-                        {/* Email */}
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
-                                {t.authLabelEmail}
-                            </label>
-                            <div className="relative">
-                                <span className={`absolute inset-y-0 ${lang === 'ar' ? 'right-0 pr-3.5' : 'left-0 pl-3.5'} flex items-center text-gray-400 pointer-events-none`}>
-                                    <Mail className="w-5 h-5" />
-                                </span>
-                                <input
-                                    type="email"
-                                    placeholder={t.authPlaceholderEmail}
-                                    value={email}
-                                    onChange={(e) => {
-                                        setEmail(e.target.value);
-                                        if (errors.email) setErrors(prev => ({ ...prev, email: "" }));
-                                    }}
-                                    className={`block w-full ${lang === 'ar' ? 'pr-11 pl-4' : 'pl-11 pr-4'} py-3 border rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 bg-gray-50/50 dark:bg-[#161622]/50 focus:bg-white dark:focus:bg-[#121216] focus:outline-none focus:ring-2 transition-all font-medium ${
-                                        errors.email 
-                                            ? "border-red-300 dark:border-red-900/50 focus:ring-red-500/20 focus:border-red-500" 
-                                            : "border-gray-200 dark:border-[#22222e] focus:ring-orange-500/20 focus:border-orange-550"
-                                    }`}
-                                />
-                            </div>
-                            {errors.email && (
-                                <span className="text-xs font-bold text-red-500 flex items-center gap-1 mt-1.5 animate-fadeIn">
-                                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                                    {errors.email}
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Password */}
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
-                                {t.authLabelPassword}
-                            </label>
-                            <div className="relative">
-                                <span className={`absolute inset-y-0 ${lang === 'ar' ? 'right-0 pr-3.5' : 'left-0 pl-3.5'} flex items-center text-gray-400 pointer-events-none`}>
-                                    <Lock className="w-5 h-5" />
-                                </span>
-                                <input
-                                    type={showPassword ? "text" : "password"}
-                                    placeholder={t.authPlaceholderPassword}
-                                    value={password}
-                                    onChange={(e) => {
-                                        setPassword(e.target.value);
-                                        if (errors.password) setErrors(prev => ({ ...prev, password: "" }));
-                                    }}
-                                    className={`block w-full ${lang === 'ar' ? 'pr-11 pl-11' : 'pl-11 pr-11'} py-3 border rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-550 bg-gray-50/50 dark:bg-[#161622]/50 focus:bg-white dark:focus:bg-[#121216] focus:outline-none focus:ring-2 transition-all font-medium ${
-                                        errors.password 
-                                            ? "border-red-300 dark:border-red-900/50 focus:ring-red-500/20 focus:border-red-500" 
-                                            : "border-gray-200 dark:border-[#22222e] focus:ring-orange-500/20 focus:border-orange-550"
-                                    }`}
-                                />
+                    {isForgotMode ? (
+                        forgotEmailSent ? (
+                            <div className="space-y-6">
+                                <div className="p-4 bg-green-50 dark:bg-green-950/30 border border-green-200/50 dark:border-green-900/30 rounded-2xl text-center space-y-3">
+                                    <AlertCircle className="w-8 h-8 text-green-500 mx-auto" />
+                                    <p className="text-sm font-semibold text-green-800 dark:text-green-300">
+                                        {t.authForgotSuccess}
+                                    </p>
+                                </div>
                                 <button
                                     type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className={`absolute inset-y-0 ${lang === 'ar' ? 'left-0 pl-3' : 'right-0 pr-3'} flex items-center text-gray-400 hover:text-gray-600 transition-colors cursor-pointer`}
+                                    onClick={() => {
+                                        setIsForgotMode(false);
+                                        setForgotEmailSent(false);
+                                        setEmail("");
+                                    }}
+                                    className="w-full bg-gray-100 hover:bg-gray-200 dark:bg-[#1a1a24] dark:hover:bg-[#252536] text-gray-800 dark:text-gray-200 font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer border border-gray-200/40 dark:border-[#22222e]/40"
                                 >
-                                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                    {t.authForgotBackLogin}
                                 </button>
                             </div>
-                            {errors.password && (
-                                <span className="text-xs font-bold text-red-500 flex items-center gap-1 mt-1.5 animate-fadeIn">
-                                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                                    {errors.password}
-                                </span>
-                            )}
-                        </div>
+                        ) : (
+                            <form onSubmit={handleForgotPassword} noValidate className="space-y-5 text-start">
+                                {/* Email */}
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
+                                        {t.authLabelEmail}
+                                    </label>
+                                    <div className="relative">
+                                        <span className={`absolute inset-y-0 ${lang === 'ar' ? 'right-0 pr-3.5' : 'left-0 pl-3.5'} flex items-center text-gray-400 pointer-events-none`}>
+                                            <Mail className="w-5 h-5" />
+                                        </span>
+                                        <input
+                                            type="email"
+                                            placeholder={t.authPlaceholderEmail}
+                                            value={email}
+                                            onChange={(e) => {
+                                                setEmail(e.target.value);
+                                                if (errors.email) setErrors(prev => ({ ...prev, email: "" }));
+                                            }}
+                                            className={`block w-full ${lang === 'ar' ? 'pr-11 pl-4' : 'pl-11 pr-4'} py-3 border rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-550 bg-gray-50/50 dark:bg-[#161622]/50 focus:bg-white dark:focus:bg-[#121216] focus:outline-none focus:ring-2 transition-all font-medium ${
+                                                errors.email 
+                                                    ? "border-red-300 dark:border-red-900/50 focus:ring-red-500/20 focus:border-red-500" 
+                                                    : "border-gray-200 dark:border-[#22222e] focus:ring-orange-500/20 focus:border-orange-500"
+                                            }`}
+                                        />
+                                    </div>
+                                    {errors.email && (
+                                        <span className="text-xs font-bold text-red-500 flex items-center gap-1 mt-1.5 animate-fadeIn">
+                                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                            {errors.email}
+                                        </span>
+                                    )}
+                                </div>
 
-                        {/* Sign In Button */}
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold py-3.5 rounded-xl transition-all shadow-md shadow-orange-500/20 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-                        >
-                            {isLoading ? (
-                                <>
-                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                    {t.authSigningIn}
-                                </>
-                            ) : (
-                                t.authBtnSignIn
-                            )}
-                        </button>
-                    </form>
+                                {/* Send Link Button */}
+                                <button
+                                    type="submit"
+                                    disabled={isLoading}
+                                    className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold py-3.5 rounded-xl transition-all shadow-md shadow-orange-500/20 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                                >
+                                    {isLoading ? (
+                                        <>
+                                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                            {t.authForgotSending}
+                                        </>
+                                    ) : (
+                                        t.authForgotBtn
+                                    )}
+                                </button>
+
+                                <div className="text-center pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsForgotMode(false);
+                                            setErrors({});
+                                        }}
+                                        className="text-sm font-bold text-gray-500 dark:text-gray-400 hover:text-orange-500 transition-colors cursor-pointer"
+                                    >
+                                        {t.authForgotBackLogin}
+                                    </button>
+                                </div>
+                            </form>
+                        )
+                    ) : (
+                        <form onSubmit={handleLogin} noValidate className="space-y-5 text-start">
+                            {/* Email */}
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
+                                    {t.authLabelEmail}
+                                </label>
+                                <div className="relative">
+                                    <span className={`absolute inset-y-0 ${lang === 'ar' ? 'right-0 pr-3.5' : 'left-0 pl-3.5'} flex items-center text-gray-400 pointer-events-none`}>
+                                        <Mail className="w-5 h-5" />
+                                    </span>
+                                    <input
+                                        type="email"
+                                        placeholder={t.authPlaceholderEmail}
+                                        value={email}
+                                        onChange={(e) => {
+                                            setEmail(e.target.value);
+                                            if (errors.email) setErrors(prev => ({ ...prev, email: "" }));
+                                        }}
+                                        className={`block w-full ${lang === 'ar' ? 'pr-11 pl-4' : 'pl-11 pr-4'} py-3 border rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-550 bg-gray-50/50 dark:bg-[#161622]/50 focus:bg-white dark:focus:bg-[#121216] focus:outline-none focus:ring-2 transition-all font-medium ${
+                                            errors.email 
+                                                ? "border-red-300 dark:border-red-900/50 focus:ring-red-500/20 focus:border-red-500" 
+                                                : "border-gray-200 dark:border-[#22222e] focus:ring-orange-500/20 focus:border-orange-500"
+                                        }`}
+                                    />
+                                </div>
+                                {errors.email && (
+                                    <span className="text-xs font-bold text-red-500 flex items-center gap-1 mt-1.5 animate-fadeIn">
+                                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                        {errors.email}
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* Password */}
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
+                                    {t.authLabelPassword}
+                                </label>
+                                <div className="relative">
+                                    <span className={`absolute inset-y-0 ${lang === 'ar' ? 'right-0 pr-3.5' : 'left-0 pl-3.5'} flex items-center text-gray-400 pointer-events-none`}>
+                                        <Lock className="w-5 h-5" />
+                                    </span>
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder={t.authPlaceholderPassword}
+                                        value={password}
+                                        onChange={(e) => {
+                                            setPassword(e.target.value);
+                                            if (errors.password) setErrors(prev => ({ ...prev, password: "" }));
+                                        }}
+                                        className={`block w-full ${lang === 'ar' ? 'pr-11 pl-11' : 'pl-11 pr-11'} py-3 border rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-550 bg-gray-50/50 dark:bg-[#161622]/50 focus:bg-white dark:focus:bg-[#121216] focus:outline-none focus:ring-2 transition-all font-medium ${
+                                            errors.password 
+                                                ? "border-red-300 dark:border-red-900/50 focus:ring-red-500/20 focus:border-red-500" 
+                                                : "border-gray-200 dark:border-[#22222e] focus:ring-orange-500/20 focus:border-orange-500"
+                                        }`}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className={`absolute inset-y-0 ${lang === 'ar' ? 'left-0 pl-3' : 'right-0 pr-3'} flex items-center text-gray-400 hover:text-gray-600 transition-colors cursor-pointer`}
+                                    >
+                                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                    </button>
+                                </div>
+                                {errors.password && (
+                                    <span className="text-xs font-bold text-red-500 flex items-center gap-1 mt-1.5 animate-fadeIn">
+                                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                        {errors.password}
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* Forgot Password link */}
+                            <div className={`flex justify-end text-xs font-semibold ${lang === 'ar' ? 'text-left' : 'text-right'} -mt-1`}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsForgotMode(true);
+                                        setErrors({});
+                                    }}
+                                    className="text-orange-500 hover:text-orange-600 transition-colors cursor-pointer font-bold"
+                                >
+                                    {t.authForgotLink}
+                                </button>
+                            </div>
+
+                            {/* Sign In Button */}
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold py-3.5 rounded-xl transition-all shadow-md shadow-orange-500/20 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        {t.authSigningIn}
+                                    </>
+                                ) : (
+                                    t.authBtnSignIn
+                                )}
+                            </button>
+                        </form>
+                    )}
 
                     {/* Footer Links */}
-                    <div className="text-center text-sm text-gray-505 dark:text-gray-400 border-t border-gray-100 dark:border-[#22222e]/40 pt-5">
+                    <div className="text-center text-sm text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-[#22222e]/40 pt-5">
                         {t.authNewToBiteFlow}{" "}
                         <Link href="/signup" className="text-orange-500 hover:text-orange-600 font-bold transition-colors">
                             {t.authCreateAccountLink}
