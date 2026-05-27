@@ -4,7 +4,7 @@ BiteFlow is a full-featured, real-time, double-sided SaaS platform designed for 
 
 ---
 
-## 🚀 The Elevator Pitch (Copy & Paste for Freelance Profiles)
+## 🚀 The Elevator Pitch
 > "Need a robust, real-time, high-performance web application? **BiteFlow** is a production-grade restaurant ordering and live management platform built using a cutting-edge modern stack: **Next.js 16 (App Router), React 19, Supabase BaaS, and Tailwind CSS v4**. With a beautiful, glassmorphic UI, full bilingual English/Arabic layout support, persistent state management via **Zustand**, and automated secure input sanitization, this project showcases clean-code architecture and commercial readiness."
 
 ---
